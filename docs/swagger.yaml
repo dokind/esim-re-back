@@ -58,6 +58,77 @@ definitions:
       total_products:
         type: integer
     type: object
+  handlers.ProductResponse:
+    properties:
+      base_price:
+        type: number
+      continent:
+        type: string
+      countries:
+        items:
+          type: string
+        type: array
+      created_at:
+        type: string
+      currency:
+        type: string
+      custom_price:
+        type: number
+      data_limit:
+        type: string
+      description:
+        type: string
+      display_price:
+        type: number
+      exchange_rate:
+        type: number
+      id:
+        type: string
+      is_active:
+        type: boolean
+      last_synced_at:
+        type: string
+      name:
+        type: string
+      price_mnt:
+        type: number
+      profit_margin:
+        type: number
+      sku_id:
+        type: string
+      updated_at:
+        type: string
+      validity_days:
+        type: integer
+    type: object
+  handlers.ProductsByContinentResponse:
+    properties:
+      Africa:
+        items:
+          $ref: '#/definitions/handlers.ProductResponse'
+        type: array
+      Asia:
+        items:
+          $ref: '#/definitions/handlers.ProductResponse'
+        type: array
+      Europe:
+        items:
+          $ref: '#/definitions/handlers.ProductResponse'
+        type: array
+      Global:
+        items:
+          $ref: '#/definitions/handlers.ProductResponse'
+        type: array
+      North America:
+        description: matches inferred continent value
+        items:
+          $ref: '#/definitions/handlers.ProductResponse'
+        type: array
+      Oceania:
+        items:
+          $ref: '#/definitions/handlers.ProductResponse'
+        type: array
+    type: object
   handlers.RegisterRequest:
     properties:
       email:
@@ -955,6 +1026,53 @@ paths:
             additionalProperties: true
             type: object
       summary: Get all products
+      tags:
+      - Products
+  /products/{id}:
+    get:
+      description: Retrieve a single product by its UUID
+      parameters:
+      - description: Product ID (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product details
+          schema:
+            $ref: '#/definitions/handlers.ProductResponse'
+        "400":
+          description: Invalid product ID
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Product not found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get product by ID
+      tags:
+      - Products
+  /products/continents:
+    get:
+      description: Retrieve active products grouped by continent
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Products grouped by continent
+          schema:
+            $ref: '#/definitions/handlers.ProductsByContinentResponse'
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get products grouped by continent
       tags:
       - Products
   /user/orders:

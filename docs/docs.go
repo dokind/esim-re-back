@@ -1156,6 +1156,76 @@ const docTemplate = `{
                 }
             }
         },
+        "/products/continents": {
+            "get": {
+                "description": "Retrieve active products grouped by continent",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get products grouped by continent",
+                "responses": {
+                    "200": {
+                        "description": "Products grouped by continent",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProductsByContinentResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/products/{id}": {
+            "get": {
+                "description": "Retrieve a single product by its UUID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get product by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Product ID (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product details",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ProductResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid product ID",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Product not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/user/orders": {
             "get": {
                 "security": [
@@ -1406,6 +1476,113 @@ const docTemplate = `{
                 },
                 "total_products": {
                     "type": "integer"
+                }
+            }
+        },
+        "handlers.ProductResponse": {
+            "type": "object",
+            "properties": {
+                "base_price": {
+                    "type": "number"
+                },
+                "continent": {
+                    "type": "string"
+                },
+                "countries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "custom_price": {
+                    "type": "number"
+                },
+                "data_limit": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "display_price": {
+                    "type": "number"
+                },
+                "exchange_rate": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "last_synced_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "price_mnt": {
+                    "type": "number"
+                },
+                "profit_margin": {
+                    "type": "number"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "validity_days": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.ProductsByContinentResponse": {
+            "type": "object",
+            "properties": {
+                "Africa": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.ProductResponse"
+                    }
+                },
+                "Asia": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.ProductResponse"
+                    }
+                },
+                "Europe": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.ProductResponse"
+                    }
+                },
+                "Global": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.ProductResponse"
+                    }
+                },
+                "North America": {
+                    "description": "matches inferred continent value",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.ProductResponse"
+                    }
+                },
+                "Oceania": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.ProductResponse"
+                    }
                 }
             }
         },

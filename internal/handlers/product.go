@@ -61,6 +61,17 @@ type ProductResponse struct {
 	UpdatedAt    string   `json:"updated_at"`
 }
 
+// ProductsByContinentResponse represents products grouped by continent for documentation
+// This is a helper struct for Swagger documentation to better describe the map response.
+type ProductsByContinentResponse struct {
+	Asia         []ProductResponse `json:"Asia,omitempty"`
+	Europe       []ProductResponse `json:"Europe,omitempty"`
+	Africa       []ProductResponse `json:"Africa,omitempty"`
+	NorthAmerica []ProductResponse `json:"North America,omitempty"` // matches inferred continent value
+	Oceania      []ProductResponse `json:"Oceania,omitempty"`
+	Global       []ProductResponse `json:"Global,omitempty"`
+}
+
 func NewProductHandler(productService *services.ProductService) *ProductHandler {
 	return &ProductHandler{
 		productService: productService,
@@ -139,6 +150,14 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 }
 
 // GetProductsByContinent retrieves products grouped by continent
+// GetProductsByContinent godoc
+// @Summary Get products grouped by continent
+// @Description Retrieve active products grouped by continent
+// @Tags Products
+// @Produce json
+// @Success 200 {object} handlers.ProductsByContinentResponse "Products grouped by continent"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /products/continents [get]
 func (h *ProductHandler) GetProductsByContinent(c *gin.Context) {
 	products, err := h.productService.GetProductsByContinent()
 	if err != nil {
@@ -160,6 +179,16 @@ func (h *ProductHandler) GetProductsByContinent(c *gin.Context) {
 }
 
 // GetProduct retrieves a specific product by ID
+// GetProduct godoc
+// @Summary Get product by ID
+// @Description Retrieve a single product by its UUID
+// @Tags Products
+// @Produce json
+// @Param id path string true "Product ID (UUID)"
+// @Success 200 {object} handlers.ProductResponse "Product details"
+// @Failure 400 {object} map[string]interface{} "Invalid product ID"
+// @Failure 404 {object} map[string]interface{} "Product not found"
+// @Router /products/{id} [get]
 func (h *ProductHandler) GetProduct(c *gin.Context) {
 	productID := c.Param("id")
 
