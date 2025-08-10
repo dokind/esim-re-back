@@ -959,105 +959,24 @@ func (r *RoamWiFiService) SendPDFEmail(orderID, email string) error {
 	return nil
 }
 
-// GetSKUByID retrieves a specific SKU by ID
+// GetSKUByID retrieves a specific SKU by ID using the legacy signed getSkus list
 func (r *RoamWiFiService) GetSKUByID(skuID string) (*SKUInfo, error) {
-	url := fmt.Sprintf("%s/sku/%s", r.config.APIURL, skuID)
-
-	req, err := http.NewRequest("GET", url, nil)
+	// Reuse existing list method (signed API). This avoids the bearer /sku/{id} path
+	// which returned HTML and caused JSON decode errors.
+	list, err := r.GetSKUList()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, err
 	}
-
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.config.APIKey))
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := r.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	var response RoamWiFiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	if response.Code != "200" {
-		return nil, fmt.Errorf("API error: %s", response.Message)
-	}
-
-	// Convert response data to SKUInfo
-	dataBytes, err := json.Marshal(response.Data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal response data: %v", err)
-	}
-
-	var sku SKUInfo
-	if err := json.Unmarshal(dataBytes, &sku); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal SKU data: %v", err)
-	}
-
-	return &sku, nil
-}
-
-// parsePackageArray converts generic interface array into domain packages
-func parsePackageArray(items []interface{}) []PackageInfo {
-	var packages []PackageInfo
-	for _, item := range items {
-		if pkgMap, ok := item.(map[string]interface{}); ok {
-			pkg := PackageInfo{}
-			if v, ok := pkgMap["package_id"].(string); ok {
-				pkg.PackageID = v
-			}
-			if pkg.PackageID == "" {
-				if v, ok := pkgMap["packageId"].(string); ok {
-					pkg.PackageID = v
-				}
-			}
-			if v, ok := pkgMap["package_name"].(string); ok {
-				pkg.PackageName = v
-			}
-			if pkg.PackageName == "" {
-				if v, ok := pkgMap["packageName"].(string); ok {
-					pkg.PackageName = v
-				}
-			}
-			if v, ok := pkgMap["data_limit"].(string); ok {
-				pkg.DataLimit = v
-			}
-			if pkg.DataLimit == "" {
-				if v, ok := pkgMap["dataLimit"].(string); ok {
-					pkg.DataLimit = v
-				}
-			}
-			if v, ok := pkgMap["validity"]; ok {
-				switch vv := v.(type) {
-				case float64:
-					pkg.Validity = int(vv)
-				case string:
-					if iv, err := strconv.Atoi(vv); err == nil {
-						pkg.Validity = iv
-					}
-				}
-			}
-			if v, ok := pkgMap["price"]; ok {
-				switch vv := v.(type) {
-				case float64:
-					pkg.Price = vv
-				case string:
-					if fv, err := strconv.ParseFloat(vv, 64); err == nil {
-						pkg.Price = fv
-					}
-				}
-			}
-			if v, ok := pkgMap["countries"].(string); ok {
-				pkg.Countries = v
-			}
-			packages = append(packages, pkg)
+	// Attempt numeric match
+	for i := range list {
+		if strconv.Itoa(list[i].SKUID) == skuID {
+			return &list[i], nil
 		}
 	}
-	return packages
+	return nil, fmt.Errorf("sku %s not found", skuID)
 }
+
+// (removed unused parsePackageArray helper)
 
 // truncatePremark provides a concise fallback package name extracted from premark HTML/long text
 func truncatePremark(s string) string {
