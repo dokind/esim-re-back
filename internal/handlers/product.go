@@ -78,6 +78,43 @@ func NewProductHandler(productService *services.ProductService) *ProductHandler 
 	}
 }
 
+// GetSKUList godoc
+// @Summary Get available SKUs
+// @Description Public: Retrieve the raw list of available eSIM SKUs from provider (for client SKU selection)
+// @Tags Products
+// @Produce json
+// @Success 200 {array} services.SKUInfo "List of SKUs"
+// @Failure 500 {object} map[string]interface{} "Failed to retrieve SKUs"
+// @Router /products/skus [get]
+func (h *ProductHandler) GetSKUList(c *gin.Context) {
+	skuList, err := h.productService.GetSKUList()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, skuList)
+}
+
+// GetSKU godoc
+// @Summary Get single SKU info
+// @Description Public: Retrieve metadata for a specific SKU
+// @Tags Products
+// @Produce json
+// @Param skuId path string true "SKU ID"
+// @Success 200 {object} services.SKUInfo "SKU details"
+// @Failure 404 {object} map[string]interface{} "SKU not found"
+// @Failure 500 {object} map[string]interface{} "Failed to retrieve SKU"
+// @Router /products/sku/{skuId} [get]
+func (h *ProductHandler) GetSKU(c *gin.Context) {
+	skuID := c.Param("skuId")
+	sku, err := h.productService.GetSKUByID(skuID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, sku)
+}
+
 // convertToProductResponse converts a Product model to ProductResponse
 func (h *ProductHandler) convertToProductResponse(product models.Product) ProductResponse {
 	response := ProductResponse{
@@ -211,15 +248,31 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 }
 
 // GetPackagesBySKU retrieves packages for a specific SKU
+// GetPackagesBySKU godoc
+// @Summary Get packages for a SKU
+// @Description Retrieve available data packages (plans) for a specific product SKU (day passes, data/validity variants)
+// @Tags Products
+// @Produce json
+// @Param skuId path string true "SKU ID"
+// @Success 200 {array} services.PackageInfo "List of packages"
+// @Failure 500 {object} map[string]interface{} "Internal server error"
+// @Router /products/sku/{skuId}/packages [get]
 func (h *ProductHandler) GetPackagesBySKU(c *gin.Context) {
 	skuID := c.Param("skuId")
-
+	if c.Query("raw") == "true" { // return raw legacy structure
+		raw, err := h.productService.GetPackagesRaw(skuID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, raw)
+		return
+	}
 	packages, err := h.productService.GetPackagesBySKU(skuID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, packages)
 }
 

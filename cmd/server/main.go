@@ -111,6 +111,8 @@ func main() {
 		{
 			products.GET("/", productHandler.GetProducts)
 			products.GET("/continents", productHandler.GetProductsByContinent)
+			products.GET("/skus", productHandler.GetSKUList)
+			products.GET("/sku/:skuId", productHandler.GetSKU)
 			products.GET("/sku/:skuId/packages", productHandler.GetPackagesBySKU)
 			products.GET("/:id", productHandler.GetProduct)
 		}

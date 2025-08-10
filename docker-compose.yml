@@ -5,6 +5,7 @@ services:
     build: .
     ports:
       - "8080:8080"
+    restart: unless-stopped
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -22,12 +23,19 @@ services:
       - ROAMWIFI_PASSWORD=Nogame123roamwifi!
       - JWT_SECRET=${JWT_SECRET}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./logs:/app/logs
     networks:
       - esim-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   postgres:
     image: postgres:15-alpine
@@ -42,6 +50,11 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - esim-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
@@ -51,6 +64,11 @@ services:
       - redis_data:/data
     networks:
       - esim-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   nginx:
     image: nginx:alpine

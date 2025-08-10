@@ -241,6 +241,30 @@ definitions:
     - name
     - sku_id
     type: object
+  services.PackageInfo:
+    properties:
+      countries:
+        type: string
+      data_limit:
+        type: string
+      package_id:
+        type: string
+      package_name:
+        type: string
+      price:
+        type: number
+      validity:
+        type: integer
+    type: object
+  services.SKUInfo:
+    properties:
+      countryCode:
+        type: string
+      display:
+        type: string
+      skuid:
+        type: integer
+    type: object
   services.UpdateProductRequest:
     properties:
       base_price:
@@ -1073,6 +1097,83 @@ paths:
             additionalProperties: true
             type: object
       summary: Get products grouped by continent
+      tags:
+      - Products
+  /products/sku/{skuId}:
+    get:
+      description: 'Public: Retrieve metadata for a specific SKU'
+      parameters:
+      - description: SKU ID
+        in: path
+        name: skuId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SKU details
+          schema:
+            $ref: '#/definitions/services.SKUInfo'
+        "404":
+          description: SKU not found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Failed to retrieve SKU
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get single SKU info
+      tags:
+      - Products
+  /products/sku/{skuId}/packages:
+    get:
+      description: Retrieve available data packages (plans) for a specific product
+        SKU (day passes, data/validity variants)
+      parameters:
+      - description: SKU ID
+        in: path
+        name: skuId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of packages
+          schema:
+            items:
+              $ref: '#/definitions/services.PackageInfo'
+            type: array
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get packages for a SKU
+      tags:
+      - Products
+  /products/skus:
+    get:
+      description: 'Public: Retrieve the raw list of available eSIM SKUs from provider
+        (for client SKU selection)'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of SKUs
+          schema:
+            items:
+              $ref: '#/definitions/services.SKUInfo'
+            type: array
+        "500":
+          description: Failed to retrieve SKUs
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get available SKUs
       tags:
       - Products
   /user/orders:

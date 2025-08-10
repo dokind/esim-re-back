@@ -13,6 +13,10 @@ help:
 	@echo "  docker-logs  - View Docker logs"
 	@echo "  setup        - Initial setup"
 	@echo "  migrate      - Run database migrations"
+	@echo "  up           - Start stack with Docker Compose"
+	@echo "  down         - Stop stack"
+	@echo "  restart      - Restart app container fast"
+	@echo "  logs-app     - Tail app logs"
 
 # Build the application
 build:
@@ -59,6 +63,20 @@ docker-logs:
 # View logs for specific service
 docker-logs-app:
 	docker-compose logs -f app
+
+# Compose shortcuts
+up:
+	docker compose up -d --build
+
+down:
+	docker compose down
+
+restart:
+	docker compose rm -sf app || true
+	docker compose up -d --build app
+
+logs-app:
+	docker compose logs -f app
 
 # Initial setup
 setup:

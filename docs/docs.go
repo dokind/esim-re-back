@@ -1183,6 +1183,118 @@ const docTemplate = `{
                 }
             }
         },
+        "/products/sku/{skuId}": {
+            "get": {
+                "description": "Public: Retrieve metadata for a specific SKU",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get single SKU info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "SKU ID",
+                        "name": "skuId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SKU details",
+                        "schema": {
+                            "$ref": "#/definitions/services.SKUInfo"
+                        }
+                    },
+                    "404": {
+                        "description": "SKU not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve SKU",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/products/sku/{skuId}/packages": {
+            "get": {
+                "description": "Retrieve available data packages (plans) for a specific product SKU (day passes, data/validity variants)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get packages for a SKU",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "SKU ID",
+                        "name": "skuId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of packages",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/services.PackageInfo"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/products/skus": {
+            "get": {
+                "description": "Public: Retrieve the raw list of available eSIM SKUs from provider (for client SKU selection)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Get available SKUs",
+                "responses": {
+                    "200": {
+                        "description": "List of SKUs",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/services.SKUInfo"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to retrieve SKUs",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/products/{id}": {
             "get": {
                 "description": "Retrieve a single product by its UUID",
@@ -1752,6 +1864,43 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "validity_days": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.PackageInfo": {
+            "type": "object",
+            "properties": {
+                "countries": {
+                    "type": "string"
+                },
+                "data_limit": {
+                    "type": "string"
+                },
+                "package_id": {
+                    "type": "string"
+                },
+                "package_name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "validity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.SKUInfo": {
+            "type": "object",
+            "properties": {
+                "countryCode": {
+                    "type": "string"
+                },
+                "display": {
+                    "type": "string"
+                },
+                "skuid": {
                     "type": "integer"
                 }
             }

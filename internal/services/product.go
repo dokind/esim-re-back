@@ -296,3 +296,18 @@ func (p *ProductService) GetProductsByPriceRange(minPrice, maxPrice float64, pag
 
 	return products, total, nil
 }
+
+// GetSKUList proxies to RoamWiFiService to fetch live SKU list
+func (p *ProductService) GetSKUList() ([]SKUInfo, error) {
+	return p.roamWiFiService.GetSKUList()
+}
+
+// GetSKUByID proxies to RoamWiFiService to fetch a single SKU
+func (p *ProductService) GetSKUByID(skuID string) (*SKUInfo, error) {
+	return p.roamWiFiService.GetSKUByID(skuID)
+}
+
+// GetPackagesRaw proxies to RoamWiFiService to fetch raw packages data
+func (p *ProductService) GetPackagesRaw(skuID string) (map[string]interface{}, error) {
+	return p.roamWiFiService.GetPackagesRaw(skuID)
+}

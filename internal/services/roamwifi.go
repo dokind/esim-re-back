@@ -24,34 +24,6 @@ type RoamWiFiService struct {
 	tokenExpiry time.Time
 }
 
-type RoamWiFiResponse struct {
-	Code    string      `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data"`
-}
-
-// Login response structure
-type LoginResponse struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
-		Token string `json:"token"`
-	} `json:"data"`
-}
-
-// SKU response structures
-type SKUInfo struct {
-	SKUID       int    `json:"skuid"`
-	Display     string `json:"display"`
-	CountryCode string `json:"countryCode"`
-}
-
-type SKUListResponse struct {
-	Code    string    `json:"code"`
-	Message string    `json:"message"`
-	Data    []SKUInfo `json:"data"`
-}
-
 type PackageInfo struct {
 	PackageID   string  `json:"package_id"`
 	PackageName string  `json:"package_name"`
@@ -61,46 +33,42 @@ type PackageInfo struct {
 	Countries   string  `json:"countries"`
 }
 
+type SKUInfo struct {
+	SKUID       int    `json:"sku_id"`
+	Display     string `json:"display"`
+	CountryCode string `json:"country_code"`
+}
+
 type OrderRequest struct {
-	SKUID         string `json:"sku_id"`
-	PackageID     string `json:"package_id"`
-	CustomerEmail string `json:"customer_email"`
-	CustomerPhone string `json:"customer_phone"`
-	Quantity      int    `json:"quantity"`
+	SKUID         string
+	PackageID     string
+	CustomerEmail string
+	CustomerPhone string
+	Quantity      int
 }
 
 type RoamWiFiOrderResponse struct {
 	OrderID        string                 `json:"order_id"`
 	Status         string                 `json:"status"`
-	ESIMData       map[string]interface{} `json:"esim_data"`
 	QRCode         string                 `json:"qr_code"`
 	ActivationCode string                 `json:"activation_code"`
+	ESIMData       map[string]interface{} `json:"esim_data"`
 }
 
 type OrderInfo struct {
-	OrderID   string                 `json:"order_id"`
-	Status    string                 `json:"status"`
-	Amount    float64                `json:"amount"`
-	CreatedAt string                 `json:"created_at"`
-	ESIMData  map[string]interface{} `json:"esim_data"`
+	OrderID string `json:"order_id"`
+	Status  string `json:"status"`
+}
+
+type RoamWiFiResponse struct {
+	Code    string      `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data"`
 }
 
 func NewRoamWiFiService(cfg config.RoamWiFiConfig) *RoamWiFiService {
-	// Create a more basic HTTP client similar to curl/wget
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives:   true, // Disable connection pooling
-			DisableCompression:  true, // Disable compression
-			MaxIdleConns:        0,    // No idle connections
-			MaxIdleConnsPerHost: 0,    // No idle connections per host
-		},
-	}
-
-	return &RoamWiFiService{
-		config: cfg,
-		client: client,
-	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	return &RoamWiFiService{config: cfg, client: client}
 }
 
 // generateSignature creates MD5 signature for authentication using RoamWiFi's method
@@ -211,90 +179,162 @@ func (r *RoamWiFiService) GetSKUList() ([]SKUInfo, error) {
 		return nil, fmt.Errorf("authentication failed: %v", err)
 	}
 
-	// Use the exact same URL pattern as working code
 	apiURL := fmt.Sprintf("%s/api_esim/getSkus", r.config.APIURL)
-
-	params := map[string]string{
-		"token": r.token,
-	}
-	signature := r.generateSignature(params)
-	params["sign"] = signature
-
-	// Build query string exactly like working code
+	params := map[string]string{"token": r.token}
+	params["sign"] = r.generateSignature(params)
 	values := url.Values{}
 	for k, v := range params {
 		values.Add(k, v)
 	}
 	fullURL := apiURL + "?" + values.Encode()
-
 	fmt.Printf("GetSkus URL: %s\n", fullURL)
-
-	// Make POST request exactly like working code
 	resp, err := http.Post(fullURL, "application/x-www-form-urlencoded", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %v", err)
 	}
 	defer resp.Body.Close()
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
-
 	fmt.Printf("SKU List API Response: %s\n", string(body))
-
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %v", err)
 	}
-
-	// Check for successful response (code should be 0 for success)
 	var codeStr string
-	if code, ok := result["code"].(float64); ok {
-		codeStr = fmt.Sprintf("%.0f", code)
-	} else if code, ok := result["code"].(string); ok {
-		codeStr = code
-	} else {
-		return nil, fmt.Errorf("unexpected code type: %T", result["code"])
+	switch v := result["code"].(type) {
+	case float64:
+		codeStr = fmt.Sprintf("%.0f", v)
+	case string:
+		codeStr = v
+	default:
+		return nil, fmt.Errorf("unexpected code type: %T", v)
 	}
-
 	if codeStr != "0" {
-		if message, exists := result["message"].(string); exists {
-			return nil, fmt.Errorf("API error: %s", message)
+		if msg, ok := result["message"].(string); ok {
+			return nil, fmt.Errorf("API error: %s", msg)
 		}
-		return nil, fmt.Errorf("API error with code: %v", result["code"])
+		return nil, fmt.Errorf("API error code=%s body=%v", codeStr, result)
 	}
-
-	// Parse data field
-	dataField, ok := result["data"].([]interface{})
+	arr, ok := result["data"].([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("unexpected data format")
 	}
-
 	var skuList []SKUInfo
-	for _, item := range dataField {
-		if skuMap, ok := item.(map[string]interface{}); ok {
+	for _, item := range arr {
+		if m, ok := item.(map[string]interface{}); ok {
 			sku := SKUInfo{}
-			if skuID, exists := skuMap["skuid"]; exists {
-				if skuIDFloat, ok := skuID.(float64); ok {
-					sku.SKUID = int(skuIDFloat)
-				}
+			if v, ok := m["skuid"].(float64); ok {
+				sku.SKUID = int(v)
 			}
-			if display, exists := skuMap["display"]; exists {
-				if displayStr, ok := display.(string); ok {
-					sku.Display = displayStr
-				}
+			if v, ok := m["display"].(string); ok {
+				sku.Display = v
 			}
-			if countryCode, exists := skuMap["countryCode"]; exists {
-				if countryCodeStr, ok := countryCode.(string); ok {
-					sku.CountryCode = countryCodeStr
-				}
+			if v, ok := m["countryCode"].(string); ok {
+				sku.CountryCode = v
 			}
 			skuList = append(skuList, sku)
 		}
 	}
-
 	return skuList, nil
+}
+
+// GetPackagesBySKU retrieves available packages for a specific SKU (legacy signed API)
+func (r *RoamWiFiService) GetPackagesBySKU(skuID string) ([]PackageInfo, error) {
+	if err := r.ensureAuthenticated(); err != nil {
+		return nil, fmt.Errorf("authentication failed: %v", err)
+	}
+	apiURL := fmt.Sprintf("%s/api_esim/getPackages", r.config.APIURL)
+	params := map[string]string{"token": r.token, "skuId": skuID}
+	params["sign"] = r.generateSignature(params)
+	values := url.Values{}
+	for k, v := range params {
+		values.Add(k, v)
+	}
+	fullURL := apiURL + "?" + values.Encode()
+	resp, err := http.Post(fullURL, "application/x-www-form-urlencoded", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+	fmt.Printf("GetPackages URL=%s RAW=%s\n", fullURL, string(body))
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+	codeVal := fmt.Sprint(result["code"])
+	if codeVal != "0" && codeVal != "200" {
+		if msg, ok := result["message"].(string); ok {
+			return nil, fmt.Errorf("API error: %s", msg)
+		}
+		return nil, fmt.Errorf("API error code=%s body=%s", codeVal, string(body))
+	}
+	dataObj, ok := result["data"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected data format: data not object keys=%v", keysOf(result))
+	}
+	list, ok := dataObj["esimPackageDtoList"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("missing esimPackageDtoList in data keys=%v", keysOf(dataObj))
+	}
+	var countries string
+	if sc, ok := dataObj["supportCountry"].([]interface{}); ok {
+		var cs []string
+		for _, c := range sc {
+			if s, ok := c.(string); ok {
+				cs = append(cs, s)
+			}
+		}
+		countries = strings.Join(cs, ",")
+	}
+	pkgs := make([]PackageInfo, 0, len(list))
+	for _, raw := range list {
+		pm, ok := raw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		pkg := PackageInfo{}
+		if v, ok := pm["apiCode"].(string); ok {
+			pkg.PackageID = v
+		}
+		if pkg.PackageID == "" {
+			if v, ok := pm["priceid"].(float64); ok {
+				pkg.PackageID = fmt.Sprintf("priceid-%d", int(v))
+			}
+		}
+		if pkg.PackageID == "" {
+			if v, ok := pm["pid"].(float64); ok {
+				pkg.PackageID = fmt.Sprintf("pid-%d", int(v))
+			}
+		}
+		if v, ok := pm["showName"].(string); ok && v != "" {
+			pkg.PackageName = v
+		}
+		if pkg.PackageName == "" {
+			if v, ok := pm["premark"].(string); ok {
+				pkg.PackageName = truncatePremark(v)
+			}
+		}
+		if flows, ok := pm["flows"].(float64); ok {
+			if unit, ok := pm["unit"].(string); ok {
+				pkg.DataLimit = fmt.Sprintf("%d%s", int(flows), unit)
+			}
+		}
+		if v, ok := pm["days"].(float64); ok {
+			pkg.Validity = int(v)
+		}
+		if v, ok := pm["price"].(float64); ok {
+			pkg.Price = v
+		}
+		pkg.Countries = countries
+		pkgs = append(pkgs, pkg)
+	}
+	return pkgs, nil
 }
 
 // GetSKUsByContinent retrieves SKUs grouped by continent from production API
@@ -393,137 +433,127 @@ func (r *RoamWiFiService) GetSKUsByContinent() ([]SKUInfo, error) {
 	return skuList, nil
 }
 
-// GetPackagesBySKU retrieves available packages for a specific SKU
-func (r *RoamWiFiService) GetPackagesBySKU(skuID string) ([]PackageInfo, error) {
+// GetPackagesBySKUBearer retains the newer bearer-based implementation for potential future use
+func (r *RoamWiFiService) GetPackagesBySKUBearer(skuID string) ([]PackageInfo, error) {
 	url := fmt.Sprintf("%s/sku/%s/packages", r.config.APIURL, skuID)
-
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
-
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", r.config.APIKey))
 	req.Header.Set("Content-Type", "application/json")
-
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %v", err)
 	}
 	defer resp.Body.Close()
-
-	var response RoamWiFiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %v", err)
 	}
-
-	if response.Code != "200" {
-		return nil, fmt.Errorf("API error: %s", response.Message)
+	// Expect code 200 here
+	var codeStr string
+	if code, ok := result["code"].(float64); ok {
+		codeStr = fmt.Sprintf("%.0f", code)
+	} else if code, ok := result["code"].(string); ok {
+		codeStr = code
 	}
-
-	// Parse the data field
-	dataBytes, err := json.Marshal(response.Data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal data: %v", err)
+	if codeStr != "200" {
+		return nil, fmt.Errorf("API error code=%s body=%s", codeStr, string(body))
 	}
-
-	var packageList []PackageInfo
-	if err := json.Unmarshal(dataBytes, &packageList); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal package list: %v", err)
-	}
-
-	return packageList, nil
+	dataBytes, _ := json.Marshal(result["data"])
+	var packages []PackageInfo
+	_ = json.Unmarshal(dataBytes, &packages)
+	return packages, nil
 }
 
-// CreateOrder creates a new eSIM order
-func (r *RoamWiFiService) CreateOrder(orderReq OrderRequest) (*RoamWiFiOrderResponse, error) {
+// CreateOrder creates an order (legacy signed endpoint)
+func (r *RoamWiFiService) CreateOrder(req OrderRequest) (*RoamWiFiOrderResponse, error) {
 	if err := r.ensureAuthenticated(); err != nil {
 		return nil, fmt.Errorf("authentication failed: %v", err)
 	}
 
-	// Use the exact same URL pattern as working code
 	apiURL := fmt.Sprintf("%s/api_order/createOrder", r.config.APIURL)
-
-	// Use the fields from OrderRequest struct
-	quantityStr := strconv.Itoa(orderReq.Quantity)
-
 	params := map[string]string{
-		"token":    r.token,
-		"skuid":    orderReq.SKUID,
-		"quantity": quantityStr,
+		"token":          r.token,
+		"sku_id":         req.SKUID,
+		"package_id":     req.PackageID,
+		"customer_email": req.CustomerEmail,
+		"customer_phone": req.CustomerPhone,
+		"quantity":       strconv.Itoa(req.Quantity),
 	}
-	signature := r.generateSignature(params)
-	params["sign"] = signature
+	// remove empty optional params to match signing expectations
+	for k, v := range params {
+		if v == "" {
+			delete(params, k)
+		}
+	}
+	params["sign"] = r.generateSignature(params)
 
-	// Build URL with query parameters - POST request like working code
 	values := url.Values{}
 	for k, v := range params {
 		values.Add(k, v)
 	}
 	fullURL := apiURL + "?" + values.Encode()
-
-	req, err := http.NewRequest("POST", fullURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := r.client.Do(req)
+	resp, err := http.Post(fullURL, "application/x-www-form-urlencoded", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %v", err)
 	}
 	defer resp.Body.Close()
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
-
-	fmt.Printf("Create Order API Response: %s\n", string(body))
+	fmt.Printf("CreateOrder URL=%s RAW=%s\n", fullURL, string(body))
 
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %v", err)
 	}
 
-	// Check for successful response (code should be 0 for success)
 	var codeStr string
-	if code, ok := result["code"].(float64); ok {
-		codeStr = fmt.Sprintf("%.0f", code)
-	} else if code, ok := result["code"].(string); ok {
-		codeStr = code
-	} else {
-		return nil, fmt.Errorf("unexpected code type: %T", result["code"])
+	switch v := result["code"].(type) {
+	case float64:
+		codeStr = fmt.Sprintf("%.0f", v)
+	case string:
+		codeStr = v
+	}
+	if codeStr != "0" && codeStr != "200" {
+		if msg, ok := result["message"].(string); ok {
+			return nil, fmt.Errorf("API error: %s", msg)
+		}
+		return nil, fmt.Errorf("API error code=%s body=%s", codeStr, string(body))
 	}
 
-	if codeStr != "0" {
-		if message, exists := result["message"].(string); exists {
-			return nil, fmt.Errorf("API error: %s", message)
-		}
-		return nil, fmt.Errorf("API error with code: %v", result["code"])
+	data, _ := result["data"].(map[string]interface{})
+	if data == nil {
+		return nil, fmt.Errorf("missing data field body=%s", string(body))
 	}
-
-	// Parse the response data
-	orderResponse := &RoamWiFiOrderResponse{}
-	if dataField, exists := result["data"].(map[string]interface{}); exists {
-		if orderID, ok := dataField["order_id"].(string); ok {
-			orderResponse.OrderID = orderID
-		}
-		if status, ok := dataField["status"].(string); ok {
-			orderResponse.Status = status
-		}
-		if qrCode, ok := dataField["qr_code"].(string); ok {
-			orderResponse.QRCode = qrCode
-		}
-		if activationCode, ok := dataField["activation_code"].(string); ok {
-			orderResponse.ActivationCode = activationCode
-		}
-		if esimData, ok := dataField["esim_data"].(map[string]interface{}); ok {
-			orderResponse.ESIMData = esimData
-		}
+	respObj := &RoamWiFiOrderResponse{}
+	if v, ok := data["order_id"].(string); ok {
+		respObj.OrderID = v
+	} else if v, ok := data["orderId"].(string); ok {
+		respObj.OrderID = v
 	}
-
-	return orderResponse, nil
+	if v, ok := data["status"].(string); ok {
+		respObj.Status = v
+	}
+	if v, ok := data["qr_code"].(string); ok {
+		respObj.QRCode = v
+	} else if v, ok := data["qrcode"].(string); ok {
+		respObj.QRCode = v
+	}
+	if v, ok := data["activation_code"].(string); ok {
+		respObj.ActivationCode = v
+	}
+	if esim, ok := data["esim_data"].(map[string]interface{}); ok {
+		respObj.ESIMData = esim
+	}
+	return respObj, nil
 }
 
 // GetOrderInfo retrieves order information by order ID
@@ -742,4 +772,118 @@ func (r *RoamWiFiService) GetSKUByID(skuID string) (*SKUInfo, error) {
 	}
 
 	return &sku, nil
+}
+
+// parsePackageArray converts generic interface array into domain packages
+func parsePackageArray(items []interface{}) []PackageInfo {
+	var packages []PackageInfo
+	for _, item := range items {
+		if pkgMap, ok := item.(map[string]interface{}); ok {
+			pkg := PackageInfo{}
+			if v, ok := pkgMap["package_id"].(string); ok {
+				pkg.PackageID = v
+			}
+			if pkg.PackageID == "" {
+				if v, ok := pkgMap["packageId"].(string); ok {
+					pkg.PackageID = v
+				}
+			}
+			if v, ok := pkgMap["package_name"].(string); ok {
+				pkg.PackageName = v
+			}
+			if pkg.PackageName == "" {
+				if v, ok := pkgMap["packageName"].(string); ok {
+					pkg.PackageName = v
+				}
+			}
+			if v, ok := pkgMap["data_limit"].(string); ok {
+				pkg.DataLimit = v
+			}
+			if pkg.DataLimit == "" {
+				if v, ok := pkgMap["dataLimit"].(string); ok {
+					pkg.DataLimit = v
+				}
+			}
+			if v, ok := pkgMap["validity"]; ok {
+				switch vv := v.(type) {
+				case float64:
+					pkg.Validity = int(vv)
+				case string:
+					if iv, err := strconv.Atoi(vv); err == nil {
+						pkg.Validity = iv
+					}
+				}
+			}
+			if v, ok := pkgMap["price"]; ok {
+				switch vv := v.(type) {
+				case float64:
+					pkg.Price = vv
+				case string:
+					if fv, err := strconv.ParseFloat(vv, 64); err == nil {
+						pkg.Price = fv
+					}
+				}
+			}
+			if v, ok := pkgMap["countries"].(string); ok {
+				pkg.Countries = v
+			}
+			packages = append(packages, pkg)
+		}
+	}
+	return packages
+}
+
+// truncatePremark provides a concise fallback package name extracted from premark HTML/long text
+func truncatePremark(s string) string {
+	if s == "" {
+		return ""
+	}
+	// strip rudimentary HTML tags
+	cleaned := s
+	for _, tag := range []string{"<p>", "</p>", "<br>", "<br/>", "<br />"} {
+		cleaned = strings.ReplaceAll(cleaned, tag, " ")
+	}
+	cleaned = strings.TrimSpace(cleaned)
+	if len(cleaned) > 60 {
+		cleaned = cleaned[:60] + "…"
+	}
+	return cleaned
+}
+
+func keysOf(m map[string]interface{}) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	return ks
+}
+
+// GetPackagesRaw mirrors legacy GetPackages returning raw decoded map
+func (r *RoamWiFiService) GetPackagesRaw(skuID string) (map[string]interface{}, error) {
+	if err := r.ensureAuthenticated(); err != nil {
+		return nil, fmt.Errorf("authentication failed: %v", err)
+	}
+	apiURL := fmt.Sprintf("%s/api_esim/getPackages", r.config.APIURL)
+	params := map[string]string{"token": r.token, "skuId": skuID}
+	params["sign"] = r.generateSignature(params)
+	values := url.Values{}
+	for k, v := range params {
+		values.Add(k, v)
+	}
+	fullURL := apiURL + "?" + values.Encode()
+	resp, err := http.Post(fullURL, "application/x-www-form-urlencoded", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+	fmt.Printf("GetPackagesRaw URL=%s RAW=%s\n", fullURL, string(body))
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+	return result, nil
 }
