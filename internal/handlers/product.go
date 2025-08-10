@@ -254,11 +254,22 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 // @Tags Products
 // @Produce json
 // @Param skuId path string true "SKU ID"
-// @Success 200 {array} services.PackageInfo "List of packages"
+// @Param detailed query bool false "If true returns detailed provider package structure"
+// @Success 200 {array} services.PackageInfo "Basic list of packages"
+// @Success 200 {object} services.RoamWiFiPackagesResponse "Detailed packages when detailed=true"
 // @Failure 500 {object} map[string]interface{} "Internal server error"
 // @Router /products/sku/{skuId}/packages [get]
 func (h *ProductHandler) GetPackagesBySKU(c *gin.Context) {
 	skuID := c.Param("skuId")
+	if c.Query("detailed") == "true" || c.Query("detailed") == "1" {
+		resp, err := h.productService.GetPackagesDetailed(skuID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, resp)
+		return
+	}
 	if c.Query("raw") == "true" { // return raw legacy structure
 		raw, err := h.productService.GetPackagesRaw(skuID)
 		if err != nil {

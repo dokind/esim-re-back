@@ -71,6 +71,232 @@ func NewRoamWiFiService(cfg config.RoamWiFiConfig) *RoamWiFiService {
 	return &RoamWiFiService{config: cfg, client: client}
 }
 
+// --- Detailed package response modeling (new) ---
+type RoamWiFiPackageNetwork struct {
+	Type     string `json:"type"`
+	Operator string `json:"operator"`
+	NameCN   string `json:"namecn"`
+	NameEN   string `json:"nameen"`
+}
+
+type RoamWiFiPackage struct {
+	APICode           string                   `json:"api_code"`
+	Flows             float64                  `json:"flows"`
+	Unit              string                   `json:"unit"`
+	Days              int                      `json:"days"`
+	Price             float64                  `json:"price"`
+	PriceID           int                      `json:"price_id"`
+	FlowType          int                      `json:"flow_type"`
+	ShowName          string                   `json:"show_name"`
+	PID               int                      `json:"pid"`
+	Premark           string                   `json:"premark"`
+	Overlay           int                      `json:"overlay"`
+	ExpireDays        int                      `json:"expire_days"`
+	Network           []RoamWiFiPackageNetwork `json:"network"`
+	SupportDaypass    int                      `json:"support_daypass"`
+	OpenCardFee       float64                  `json:"open_card_fee"`
+	MinDay            int                      `json:"min_day"`
+	SingleDiscountDay int                      `json:"single_discount_day"`
+	SingleDiscount    int                      `json:"single_discount"`
+	MaxDiscount       int                      `json:"max_discount"`
+	MaxDay            int                      `json:"max_day"`
+	MustDate          int                      `json:"must_date"`
+	HadDaypassDetail  int                      `json:"had_daypass_detail"`
+}
+
+type RoamWiFiCountryImage struct {
+	CountryCode int    `json:"country_code"`
+	ImageURL    string `json:"image_url"`
+	Name        string `json:"name"`
+	NameEn      string `json:"name_en"`
+}
+
+type RoamWiFiPackagesResponse struct {
+	SKUId          int                    `json:"sku_id"`
+	Display        string                 `json:"display"`
+	DisplayEn      string                 `json:"display_en"`
+	CountryCode    string                 `json:"country_code"`
+	SupportCountry []string               `json:"support_country"`
+	ImageURL       string                 `json:"image_url"`
+	CountryImages  []RoamWiFiCountryImage `json:"country_images"`
+	Packages       []RoamWiFiPackage      `json:"packages"`
+}
+
+// GetPackagesDetailed returns rich provider data mapped into internal structs
+func (r *RoamWiFiService) GetPackagesDetailed(skuID string) (*RoamWiFiPackagesResponse, error) {
+	if err := r.ensureAuthenticated(); err != nil {
+		return nil, fmt.Errorf("authentication failed: %v", err)
+	}
+	apiURL := fmt.Sprintf("%s/api_esim/getPackages", r.config.APIURL)
+	params := map[string]string{"token": r.token, "skuId": skuID}
+	params["sign"] = r.generateSignature(params)
+	values := url.Values{}
+	for k, v := range params {
+		values.Add(k, v)
+	}
+	fullURL := apiURL + "?" + values.Encode()
+	resp, err := http.Post(fullURL, "application/x-www-form-urlencoded", nil)
+	if err != nil {
+		return nil, fmt.Errorf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read failed: %v", err)
+	}
+	fmt.Printf("GetPackagesDetailed URL=%s RAW=%s\n", fullURL, string(body))
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("decode failed: %v", err)
+	}
+	code := fmt.Sprint(raw["code"])
+	if code != "0" && code != "200" {
+		return nil, fmt.Errorf("API error code=%s", code)
+	}
+	data, ok := raw["data"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected data structure")
+	}
+	respObj := &RoamWiFiPackagesResponse{}
+	if v, ok := data["skuid"].(float64); ok {
+		respObj.SKUId = int(v)
+	}
+	if v, ok := data["display"].(string); ok {
+		respObj.Display = v
+	}
+	if v, ok := data["displayEn"].(string); ok {
+		respObj.DisplayEn = v
+	}
+	if v, ok := data["countrycode"].(string); ok {
+		respObj.CountryCode = v
+	} else if v2, ok2 := data["countrycode"].(float64); ok2 {
+		respObj.CountryCode = strconv.Itoa(int(v2))
+	}
+	if v, ok := data["imageUrl"].(string); ok {
+		respObj.ImageURL = v
+	}
+	if arr, ok := data["supportCountry"].([]interface{}); ok {
+		for _, c := range arr {
+			if s, ok := c.(string); ok {
+				respObj.SupportCountry = append(respObj.SupportCountry, s)
+			}
+		}
+	}
+	if imgs, ok := data["countryImageUrlDtoList"].([]interface{}); ok {
+		for _, im := range imgs {
+			if m, ok := im.(map[string]interface{}); ok {
+				ci := RoamWiFiCountryImage{}
+				if v, ok := m["countryCode"].(float64); ok {
+					ci.CountryCode = int(v)
+				}
+				if v, ok := m["imageUrl"].(string); ok {
+					ci.ImageURL = v
+				}
+				if v, ok := m["name"].(string); ok {
+					ci.Name = v
+				}
+				if v, ok := m["nameEn"].(string); ok {
+					ci.NameEn = v
+				}
+				respObj.CountryImages = append(respObj.CountryImages, ci)
+			}
+		}
+	}
+	// packages
+	if list, ok := data["esimPackageDtoList"].([]interface{}); ok {
+		for _, item := range list {
+			if m, ok := item.(map[string]interface{}); ok {
+				p := RoamWiFiPackage{}
+				if v, ok := m["apiCode"].(string); ok {
+					p.APICode = v
+				}
+				if v, ok := m["flows"].(float64); ok {
+					p.Flows = v
+				}
+				if v, ok := m["unit"].(string); ok {
+					p.Unit = v
+				}
+				if v, ok := m["days"].(float64); ok {
+					p.Days = int(v)
+				}
+				if v, ok := m["price"].(float64); ok {
+					p.Price = v
+				}
+				if v, ok := m["priceid"].(float64); ok {
+					p.PriceID = int(v)
+				}
+				if v, ok := m["flowType"].(float64); ok {
+					p.FlowType = int(v)
+				}
+				if v, ok := m["showName"].(string); ok {
+					p.ShowName = v
+				}
+				if v, ok := m["pid"].(float64); ok {
+					p.PID = int(v)
+				}
+				if v, ok := m["premark"].(string); ok {
+					p.Premark = v
+				}
+				if v, ok := m["overlay"].(float64); ok {
+					p.Overlay = int(v)
+				}
+				if v, ok := m["expireDays"].(float64); ok {
+					p.ExpireDays = int(v)
+				}
+				if v, ok := m["supportDaypass"].(float64); ok {
+					p.SupportDaypass = int(v)
+				}
+				if v, ok := m["openCardFee"].(float64); ok {
+					p.OpenCardFee = v
+				}
+				if v, ok := m["minDay"].(float64); ok {
+					p.MinDay = int(v)
+				}
+				if v, ok := m["singleDiscountDay"].(float64); ok {
+					p.SingleDiscountDay = int(v)
+				}
+				if v, ok := m["singleDiscount"].(float64); ok {
+					p.SingleDiscount = int(v)
+				}
+				if v, ok := m["maxDiscount"].(float64); ok {
+					p.MaxDiscount = int(v)
+				}
+				if v, ok := m["maxDay"].(float64); ok {
+					p.MaxDay = int(v)
+				}
+				if v, ok := m["mustDate"].(float64); ok {
+					p.MustDate = int(v)
+				}
+				if v, ok := m["hadDaypassDetail"].(float64); ok {
+					p.HadDaypassDetail = int(v)
+				}
+				if nets, ok := m["networkDtoList"].([]interface{}); ok {
+					for _, n := range nets {
+						if nm, ok := n.(map[string]interface{}); ok {
+							nw := RoamWiFiPackageNetwork{}
+							if v, ok := nm["type"].(string); ok {
+								nw.Type = v
+							}
+							if v, ok := nm["operator"].(string); ok {
+								nw.Operator = v
+							}
+							if v, ok := nm["namecn"].(string); ok {
+								nw.NameCN = v
+							}
+							if v, ok := nm["nameen"].(string); ok {
+								nw.NameEN = v
+							}
+							p.Network = append(p.Network, nw)
+						}
+					}
+				}
+				respObj.Packages = append(respObj.Packages, p)
+			}
+		}
+	}
+	return respObj, nil
+}
+
 // generateSignature creates MD5 signature for authentication using RoamWiFi's method
 func (r *RoamWiFiService) generateSignature(params map[string]string) string {
 	signKey := "ro@mw1f1-bpm-ap1"

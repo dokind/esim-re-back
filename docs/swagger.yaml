@@ -1,6 +1,195 @@
 basePath: /api/v1
 definitions:
-  handlers.CreateOrderRequest:
+  esim-platform_internal_models.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      is_admin:
+        type: boolean
+      last_name:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  esim-platform_internal_services.CreateProductRequest:
+    properties:
+      base_price:
+        type: number
+      continent:
+        type: string
+      countries:
+        items:
+          type: string
+        type: array
+      custom_price:
+        type: number
+      data_limit:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      sku_id:
+        type: string
+      validity_days:
+        type: integer
+    required:
+    - base_price
+    - name
+    - sku_id
+    type: object
+  esim-platform_internal_services.PackageInfo:
+    properties:
+      countries:
+        type: string
+      data_limit:
+        type: string
+      package_id:
+        type: string
+      package_name:
+        type: string
+      price:
+        type: number
+      validity:
+        type: integer
+    type: object
+  esim-platform_internal_services.RoamWiFiCountryImage:
+    properties:
+      country_code:
+        type: integer
+      image_url:
+        type: string
+      name:
+        type: string
+      name_en:
+        type: string
+    type: object
+  esim-platform_internal_services.RoamWiFiPackage:
+    properties:
+      api_code:
+        type: string
+      days:
+        type: integer
+      expire_days:
+        type: integer
+      flow_type:
+        type: integer
+      flows:
+        type: number
+      had_daypass_detail:
+        type: integer
+      max_day:
+        type: integer
+      max_discount:
+        type: integer
+      min_day:
+        type: integer
+      must_date:
+        type: integer
+      network:
+        items:
+          $ref: '#/definitions/esim-platform_internal_services.RoamWiFiPackageNetwork'
+        type: array
+      open_card_fee:
+        type: number
+      overlay:
+        type: integer
+      pid:
+        type: integer
+      premark:
+        type: string
+      price:
+        type: number
+      price_id:
+        type: integer
+      show_name:
+        type: string
+      single_discount:
+        type: integer
+      single_discount_day:
+        type: integer
+      support_daypass:
+        type: integer
+      unit:
+        type: string
+    type: object
+  esim-platform_internal_services.RoamWiFiPackageNetwork:
+    properties:
+      namecn:
+        type: string
+      nameen:
+        type: string
+      operator:
+        type: string
+      type:
+        type: string
+    type: object
+  esim-platform_internal_services.RoamWiFiPackagesResponse:
+    properties:
+      country_code:
+        type: string
+      country_images:
+        items:
+          $ref: '#/definitions/esim-platform_internal_services.RoamWiFiCountryImage'
+        type: array
+      display:
+        type: string
+      display_en:
+        type: string
+      image_url:
+        type: string
+      packages:
+        items:
+          $ref: '#/definitions/esim-platform_internal_services.RoamWiFiPackage'
+        type: array
+      sku_id:
+        type: integer
+      support_country:
+        items:
+          type: string
+        type: array
+    type: object
+  esim-platform_internal_services.SKUInfo:
+    properties:
+      country_code:
+        type: string
+      display:
+        type: string
+      sku_id:
+        type: integer
+    type: object
+  esim-platform_internal_services.UpdateProductRequest:
+    properties:
+      base_price:
+        type: number
+      continent:
+        type: string
+      countries:
+        items:
+          type: string
+        type: array
+      custom_price:
+        type: number
+      data_limit:
+        type: string
+      description:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      validity_days:
+        type: integer
+    type: object
+  internal_handlers.CreateOrderRequest:
     properties:
       custom_price:
         type: number
@@ -16,7 +205,7 @@ definitions:
     - customer_email
     - product_id
     type: object
-  handlers.LoginRequest:
+  internal_handlers.LoginRequest:
     properties:
       email:
         type: string
@@ -26,16 +215,16 @@ definitions:
     - email
     - password
     type: object
-  handlers.LoginResponse:
+  internal_handlers.LoginResponse:
     properties:
       refresh_token:
         type: string
       token:
         type: string
       user:
-        $ref: '#/definitions/models.User'
+        $ref: '#/definitions/esim-platform_internal_models.User'
     type: object
-  handlers.PricingInfo:
+  internal_handlers.PricingInfo:
     properties:
       current_exchange_rate:
         type: number
@@ -44,7 +233,7 @@ definitions:
       last_updated:
         type: string
     type: object
-  handlers.ProductAnalyticsResponse:
+  internal_handlers.ProductAnalyticsResponse:
     properties:
       active_products:
         type: integer
@@ -58,7 +247,7 @@ definitions:
       total_products:
         type: integer
     type: object
-  handlers.ProductResponse:
+  internal_handlers.ProductResponse:
     properties:
       base_price:
         type: number
@@ -101,35 +290,35 @@ definitions:
       validity_days:
         type: integer
     type: object
-  handlers.ProductsByContinentResponse:
+  internal_handlers.ProductsByContinentResponse:
     properties:
       Africa:
         items:
-          $ref: '#/definitions/handlers.ProductResponse'
+          $ref: '#/definitions/internal_handlers.ProductResponse'
         type: array
       Asia:
         items:
-          $ref: '#/definitions/handlers.ProductResponse'
+          $ref: '#/definitions/internal_handlers.ProductResponse'
         type: array
       Europe:
         items:
-          $ref: '#/definitions/handlers.ProductResponse'
+          $ref: '#/definitions/internal_handlers.ProductResponse'
         type: array
       Global:
         items:
-          $ref: '#/definitions/handlers.ProductResponse'
+          $ref: '#/definitions/internal_handlers.ProductResponse'
         type: array
       North America:
         description: matches inferred continent value
         items:
-          $ref: '#/definitions/handlers.ProductResponse'
+          $ref: '#/definitions/internal_handlers.ProductResponse'
         type: array
       Oceania:
         items:
-          $ref: '#/definitions/handlers.ProductResponse'
+          $ref: '#/definitions/internal_handlers.ProductResponse'
         type: array
     type: object
-  handlers.RegisterRequest:
+  internal_handlers.RegisterRequest:
     properties:
       email:
         type: string
@@ -146,7 +335,7 @@ definitions:
     - email
     - password
     type: object
-  handlers.SalesAnalyticsResponse:
+  internal_handlers.SalesAnalyticsResponse:
     properties:
       average_order_value:
         type: number
@@ -161,21 +350,21 @@ definitions:
       total_sales:
         type: number
     type: object
-  handlers.SetProductPriceRequest:
+  internal_handlers.SetProductPriceRequest:
     properties:
       price:
         type: number
     required:
     - price
     type: object
-  handlers.UpdateExchangeRateRequest:
+  internal_handlers.UpdateExchangeRateRequest:
     properties:
       rate:
         type: number
     required:
     - rate
     type: object
-  handlers.UpdateSettingsRequest:
+  internal_handlers.UpdateSettingsRequest:
     properties:
       settings:
         additionalProperties:
@@ -184,7 +373,7 @@ definitions:
     required:
     - settings
     type: object
-  handlers.UpdateUserRequest:
+  internal_handlers.UpdateUserRequest:
     properties:
       first_name:
         type: string
@@ -194,99 +383,6 @@ definitions:
         type: string
       phone:
         type: string
-    type: object
-  models.User:
-    properties:
-      created_at:
-        type: string
-      email:
-        type: string
-      first_name:
-        type: string
-      id:
-        type: string
-      is_admin:
-        type: boolean
-      last_name:
-        type: string
-      phone:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  services.CreateProductRequest:
-    properties:
-      base_price:
-        type: number
-      continent:
-        type: string
-      countries:
-        items:
-          type: string
-        type: array
-      custom_price:
-        type: number
-      data_limit:
-        type: string
-      description:
-        type: string
-      name:
-        type: string
-      sku_id:
-        type: string
-      validity_days:
-        type: integer
-    required:
-    - base_price
-    - name
-    - sku_id
-    type: object
-  services.PackageInfo:
-    properties:
-      countries:
-        type: string
-      data_limit:
-        type: string
-      package_id:
-        type: string
-      package_name:
-        type: string
-      price:
-        type: number
-      validity:
-        type: integer
-    type: object
-  services.SKUInfo:
-    properties:
-      countryCode:
-        type: string
-      display:
-        type: string
-      skuid:
-        type: integer
-    type: object
-  services.UpdateProductRequest:
-    properties:
-      base_price:
-        type: number
-      continent:
-        type: string
-      countries:
-        items:
-          type: string
-        type: array
-      custom_price:
-        type: number
-      data_limit:
-        type: string
-      description:
-        type: string
-      is_active:
-        type: boolean
-      name:
-        type: string
-      validity_days:
-        type: integer
     type: object
 host: localhost:8080
 info:
@@ -311,7 +407,7 @@ paths:
         "200":
           description: Product analytics data
           schema:
-            $ref: '#/definitions/handlers.ProductAnalyticsResponse'
+            $ref: '#/definitions/internal_handlers.ProductAnalyticsResponse'
       security:
       - Bearer: []
       summary: Get product analytics (Admin)
@@ -327,7 +423,7 @@ paths:
         "200":
           description: Sales analytics data
           schema:
-            $ref: '#/definitions/handlers.SalesAnalyticsResponse'
+            $ref: '#/definitions/internal_handlers.SalesAnalyticsResponse'
       security:
       - Bearer: []
       summary: Get sales analytics (Admin)
@@ -459,7 +555,7 @@ paths:
         name: rate
         required: true
         schema:
-          $ref: '#/definitions/handlers.UpdateExchangeRateRequest'
+          $ref: '#/definitions/internal_handlers.UpdateExchangeRateRequest'
       produces:
       - application/json
       responses:
@@ -494,7 +590,7 @@ paths:
         "200":
           description: Current pricing information
           schema:
-            $ref: '#/definitions/handlers.PricingInfo'
+            $ref: '#/definitions/internal_handlers.PricingInfo'
         "500":
           description: Internal server error
           schema:
@@ -539,7 +635,7 @@ paths:
         name: product
         required: true
         schema:
-          $ref: '#/definitions/services.CreateProductRequest'
+          $ref: '#/definitions/esim-platform_internal_services.CreateProductRequest'
       produces:
       - application/json
       responses:
@@ -612,7 +708,7 @@ paths:
         name: product
         required: true
         schema:
-          $ref: '#/definitions/services.UpdateProductRequest'
+          $ref: '#/definitions/esim-platform_internal_services.UpdateProductRequest'
       produces:
       - application/json
       responses:
@@ -653,7 +749,7 @@ paths:
         name: price
         required: true
         schema:
-          $ref: '#/definitions/handlers.SetProductPriceRequest'
+          $ref: '#/definitions/internal_handlers.SetProductPriceRequest'
       produces:
       - application/json
       responses:
@@ -722,7 +818,7 @@ paths:
         name: settings
         required: true
         schema:
-          $ref: '#/definitions/handlers.UpdateSettingsRequest'
+          $ref: '#/definitions/internal_handlers.UpdateSettingsRequest'
       produces:
       - application/json
       responses:
@@ -823,7 +919,7 @@ paths:
         name: user
         required: true
         schema:
-          $ref: '#/definitions/handlers.UpdateUserRequest'
+          $ref: '#/definitions/internal_handlers.UpdateUserRequest'
       produces:
       - application/json
       responses:
@@ -864,14 +960,14 @@ paths:
         name: credentials
         required: true
         schema:
-          $ref: '#/definitions/handlers.LoginRequest'
+          $ref: '#/definitions/internal_handlers.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Login successful
           schema:
-            $ref: '#/definitions/handlers.LoginResponse'
+            $ref: '#/definitions/internal_handlers.LoginResponse'
         "400":
           description: Invalid input
           schema:
@@ -896,14 +992,14 @@ paths:
         name: user
         required: true
         schema:
-          $ref: '#/definitions/handlers.RegisterRequest'
+          $ref: '#/definitions/internal_handlers.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: User created successfully
           schema:
-            $ref: '#/definitions/handlers.LoginResponse'
+            $ref: '#/definitions/internal_handlers.LoginResponse'
         "400":
           description: Invalid input
           schema:
@@ -933,7 +1029,7 @@ paths:
         name: order
         required: true
         schema:
-          $ref: '#/definitions/handlers.CreateOrderRequest'
+          $ref: '#/definitions/internal_handlers.CreateOrderRequest'
       produces:
       - application/json
       responses:
@@ -1067,7 +1163,7 @@ paths:
         "200":
           description: Product details
           schema:
-            $ref: '#/definitions/handlers.ProductResponse'
+            $ref: '#/definitions/internal_handlers.ProductResponse'
         "400":
           description: Invalid product ID
           schema:
@@ -1090,7 +1186,7 @@ paths:
         "200":
           description: Products grouped by continent
           schema:
-            $ref: '#/definitions/handlers.ProductsByContinentResponse'
+            $ref: '#/definitions/internal_handlers.ProductsByContinentResponse'
         "500":
           description: Internal server error
           schema:
@@ -1114,7 +1210,7 @@ paths:
         "200":
           description: SKU details
           schema:
-            $ref: '#/definitions/services.SKUInfo'
+            $ref: '#/definitions/esim-platform_internal_services.SKUInfo'
         "404":
           description: SKU not found
           schema:
@@ -1138,15 +1234,17 @@ paths:
         name: skuId
         required: true
         type: string
+      - description: If true returns detailed provider package structure
+        in: query
+        name: detailed
+        type: boolean
       produces:
       - application/json
       responses:
         "200":
-          description: List of packages
+          description: Detailed packages when detailed=true
           schema:
-            items:
-              $ref: '#/definitions/services.PackageInfo'
-            type: array
+            $ref: '#/definitions/esim-platform_internal_services.RoamWiFiPackagesResponse'
         "500":
           description: Internal server error
           schema:
@@ -1166,7 +1264,7 @@ paths:
           description: List of SKUs
           schema:
             items:
-              $ref: '#/definitions/services.SKUInfo'
+              $ref: '#/definitions/esim-platform_internal_services.SKUInfo'
             type: array
         "500":
           description: Failed to retrieve SKUs

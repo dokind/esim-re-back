@@ -311,3 +311,8 @@ func (p *ProductService) GetSKUByID(skuID string) (*SKUInfo, error) {
 func (p *ProductService) GetPackagesRaw(skuID string) (map[string]interface{}, error) {
 	return p.roamWiFiService.GetPackagesRaw(skuID)
 }
+
+// GetPackagesDetailed proxies to RoamWiFiService detailed response
+func (p *ProductService) GetPackagesDetailed(skuID string) (*RoamWiFiPackagesResponse, error) {
+	return p.roamWiFiService.GetPackagesDetailed(skuID)
+}
