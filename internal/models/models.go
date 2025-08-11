@@ -82,7 +82,7 @@ type User struct {
 
 type Product struct {
 	ID           uuid.UUID   `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	SKUID        string      `json:"sku_id" gorm:"column:sk_uid;not null"`
+	SKUID        string      `json:"sku_id" gorm:"not null"`
 	Name         string      `json:"name" gorm:"not null"`
 	Description  string      `json:"description"`
 	DataLimit    string      `json:"data_limit"`
@@ -163,7 +163,7 @@ type AuditLog struct {
 // Package represents an eSIM package offered by RoamWiFi
 type Package struct {
 	ID                 uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	SKUID              string     `json:"sku_id" gorm:"column:sk_uid;not null"`
+	SKUID              string     `json:"sku_id" gorm:"not null"`
 	PackageID          string     `json:"package_id" gorm:"not null"`
 	PackageName        string     `json:"package_name" gorm:"not null"`
 	DataLimit          string     `json:"data_limit"`
@@ -183,7 +183,7 @@ type Package struct {
 // PackagePrice stores pricing & override data for provider package (using provider price_id)
 type PackagePrice struct {
 	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	SKUID             string     `json:"sku_id" gorm:"column:sk_uid;index;not null"`
+	SKUID             string     `json:"sku_id" gorm:"index;not null"`
 	ProviderPriceID   int        `json:"provider_price_id" gorm:"uniqueIndex:uniq_provider_price"`
 	APICode           string     `json:"api_code" gorm:"index"`
 	ShowName          string     `json:"show_name"`
