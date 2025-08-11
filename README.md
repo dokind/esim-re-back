@@ -95,15 +95,17 @@ The platform provides the following API endpoints:
 - `POST /api/v1/auth/refresh` - Token refresh
 
 #### Products
-- `GET /api/v1/products` - List all products
+- `GET /api/v1/products` - List all products (basic info)
 - `GET /api/v1/products/continents` - Products grouped by continent
-- `GET /api/v1/products/:skuId/packages` - Packages for specific SKU
-- `GET /api/v1/products/:id` - Get specific product
+- `GET /api/v1/products/skus` - List provider SKUs (public)
+- `GET /api/v1/products/sku/:skuId` - Get a single SKU (public)
+- `GET /api/v1/products/sku/:skuId/packages` - Packages for a specific SKU (optionally enriched)
+- `GET /api/v1/products/:id` - Get specific product by internal UUID
 
 #### Orders
-- `POST /api/v1/orders` - Create new order
+- `POST /api/v1/orders` - Create new order (requires product_id + package_price_id or provider_price_id)
 - `GET /api/v1/orders/:orderNumber` - Get order details
-- `POST /api/v1/orders/:orderNumber/pay` - Initiate payment
+- `POST /api/v1/orders/:orderNumber/pay` - Initiate (or re-initiate) payment invoice
 
 #### Webhooks
 - `POST /api/v1/webhooks/qpay` - QPay payment webhook
@@ -121,25 +123,33 @@ The platform provides the following API endpoints:
 
 ## API Examples
 
-### Create an Order
+### Create an Order (User Purchase Flow)
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/orders \
-  -H "Content-Type: application/json" \
-  -d '{
-    "product_id": "uuid-of-product",
-    "customer_email": "customer@example.com",
-    "customer_phone": "+97612345678",
-    "custom_price": 15000
-  }'
+   -H "Content-Type: application/json" \
+   -d '{
+      "product_id": "<product-uuid>",
+      "package_price_id": "<package-price-uuid>",
+      "customer_email": "customer@example.com",
+      "customer_phone": "+97612345678",
+      "custom_price_usd": 12.00
+   }'
 ```
 
-### Initiate Payment
+Notes:
+- Provide either `package_price_id` (preferred) OR `provider_price_id` if you only have the upstream price id.
+- `custom_price_usd` is optional; if omitted the system uses the package's effective USD price (base + markup or override).
+- The server converts USD to MNT using the current stored exchange rate.
+
+### Initiate Payment / Re-Issue Invoice
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/orders/ESIM123456789/pay \
-  -H "Content-Type: application/json"
+   -H "Content-Type: application/json"
 ```
+
+If the order already has a pending invoice the service may reuse or create a new one depending on state.
 
 ### Get Products by Continent
 
@@ -153,6 +163,53 @@ curl -X GET http://localhost:8080/api/v1/products/continents
 curl -X POST http://localhost:8080/api/v1/admin/products/sync \
   -H "Authorization: Bearer your-admin-token"
 ```
+
+## User Purchase Flow (Detailed)
+
+1. Discover packages:
+   - `GET /api/v1/products/skus` or `GET /api/v1/products/sku/{skuId}/packages` (frontend obtains `package_price_id`, pricing metadata, validity, data limit, countries).
+2. User selects a package; frontend stores `product_id` + `package_price_id`.
+3. Create order (POST `/api/v1/orders`). Server:
+   - Validates product & package alignment.
+   - Determines USD price (override > markup > base provider price).
+   - Converts to MNT.
+   - Persists order (status=pending) + creates QPay invoice.
+4. Response returns: order_number, amount (MNT), payment_url, qr_code.
+5. User completes payment via QPay (browser / app).
+6. QPay webhook (`POST /api/v1/webhooks/qpay`) marks order `paid` and triggers eSIM provisioning with RoamWiFi.
+7. On success provisioning updates order to `completed` with eSIM activation data (QR / activation code).
+8. Client polls `GET /api/v1/orders/{orderNumber}` (or future websocket) until status becomes `completed`.
+
+Edge cases:
+- Payment timeout → order stays `pending` or transitions to `expired` (future enhancement).
+- Provider provisioning failure → order `failed`; manual intervention required.
+- Re-initiate invoice if user lost it: POST `/api/v1/orders/{orderNumber}/pay`.
+
+## Admin Pricing & Package Management Flow
+
+1. Sync packages (manual or scheduled): `POST /api/v1/admin/products/sync` (or per-SKU sync endpoint) pulls provider SKUs & upserts `PackagePrice` records.
+2. Adjust markup: `PUT /api/v1/admin/packages/{priceId}/markup { "percent": 15 }` recalculates effective USD + MNT.
+3. Apply override: `PUT /api/v1/admin/packages/{priceId}/override { "price_usd": 9.99 }` (override supersedes markup).
+4. Remove override: `PUT /api/v1/admin/packages/{priceId}/override` with null body or `DELETE` (if implemented) to revert to markup.
+5. Update FX rate: `PUT /api/v1/admin/pricing/exchange-rate { "usd_to_mnt": 3450 }` then optionally `POST /api/v1/admin/pricing/update-all` to recompute MNT amounts.
+6. Inspect pricing: (future) add an endpoint to list enriched package pricing for admin dashboards.
+
+Operational notes:
+- Orders always reference the `PackagePriceID` used at creation for historical price integrity.
+- Changing markup/override after an order does not retroactively alter past orders.
+- Use exchange rate refresh sparingly—bulk recompute ensures MNT consistency.
+
+## Testing the Purchase Flow Locally
+
+Minimal smoke test (requires valid env for QPay & RoamWiFi or stubs):
+1. Start stack: `docker compose up -d --build`.
+2. Sync products: `curl -X POST http://localhost:8080/api/v1/admin/products/sync -H "Authorization: Bearer <admin-token>"`.
+3. Fetch packages for a SKU and pick one `package_price_id`.
+4. Create order (as above) and open returned `payment_url`.
+5. Simulate webhook (if no real QPay) by POSTing a crafted payload to `/api/v1/webhooks/qpay` matching the order_number; mark payment_status paid.
+6. Get order and confirm status `completed` and presence of eSIM data fields.
+
+If step 5 uses a manual webhook simulation ensure invoice IDs align or temporarily relax validation logic (development only).
 
 ## Database Schema
 
