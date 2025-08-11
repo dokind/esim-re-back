@@ -138,8 +138,8 @@ func (p *ProductService) SyncPackagePrices(skuID string) error {
 	for _, pkg := range detailed.Packages {
 		providerIDs = append(providerIDs, pkg.PriceID)
 	}
-	// NOTE: DB column is sk_uid (legacy naming); GORM maps struct field SKUID -> sk_uid.
-	if err := p.db.Model(&models.PackagePrice{}).Where("sk_uid = ? AND provider_price_id NOT IN ?", skuID, providerIDs).Updates(map[string]interface{}{"active": false}).Error; err != nil {
+	// Deactivate any packages no longer returned by provider
+	if err := p.db.Model(&models.PackagePrice{}).Where("sku_id = ? AND provider_price_id NOT IN ?", skuID, providerIDs).Updates(map[string]interface{}{"active": false}).Error; err != nil {
 		return fmt.Errorf("deactivate missing packages: %w", err)
 	}
 	return nil
@@ -368,7 +368,7 @@ func (p *ProductService) SyncProductsFromRoamWiFi() (int, error) {
 
 		// Check if product already exists
 		var existingProduct models.Product
-		if err := p.db.Where("sk_uid = ?", skuIDStr).First(&existingProduct).Error; err == nil {
+		if err := p.db.Where("sku_id = ?", skuIDStr).First(&existingProduct).Error; err == nil {
 			// Product exists, update it
 			existingProduct.Name = sku.Display
 			existingProduct.Continent = p.inferContinentFromDisplay(sku.Display)
@@ -507,7 +507,7 @@ func (p *ProductService) GetPackagesDetailed(skuID string) (*EnrichedRoamWiFiPac
 	// Load pricing map
 	var prices []models.PackagePrice
 	priceMap := map[int]models.PackagePrice{}
-	if err := p.db.Where("sk_uid = ? AND active = ?", skuID, true).Find(&prices).Error; err == nil {
+	if err := p.db.Where("sku_id = ? AND active = ?", skuID, true).Find(&prices).Error; err == nil {
 		for _, pr := range prices {
 			priceMap[pr.ProviderPriceID] = pr
 		}
