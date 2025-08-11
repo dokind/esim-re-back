@@ -177,7 +177,7 @@ curl -X POST http://localhost:8080/api/v1/admin/products/sync \
 - `countries` (TEXT[]) - Array of country codes
 - `continent` (VARCHAR) - Continent
 - `base_price` (DECIMAL) - Base price
-- `custom_price` (DECIMAL) - Custom price (optional)
+- `custom_price_usd` (DECIMAL) - Custom USD override price (optional; applied before FX conversion)
 - `is_active` (BOOLEAN) - Active flag
 - `created_at` (TIMESTAMP) - Creation time
 - `updated_at` (TIMESTAMP) - Update time
@@ -197,6 +197,17 @@ curl -X POST http://localhost:8080/api/v1/admin/products/sync \
 - `esim_data` (JSONB) - eSIM activation data
 - `created_at` (TIMESTAMP) - Creation time
 - `updated_at` (TIMESTAMP) - Update time
+
+### Migration (2025-08-11)
+Field rename: `custom_price` -> `custom_price_usd`.
+If you had existing data run:
+```sql
+UPDATE products SET custom_price_usd = custom_price WHERE custom_price_usd IS NULL;
+```
+Then optionally drop old column if still present:
+```sql
+ALTER TABLE products DROP COLUMN IF EXISTS custom_price;
+```
 
 ## Development
 

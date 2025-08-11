@@ -18,25 +18,29 @@ type OrderService struct {
 }
 
 type CreateOrderRequest struct {
-	ProductID     uuid.UUID  `json:"product_id" binding:"required"`
-	CustomerEmail string     `json:"customer_email" binding:"required,email"`
-	CustomerPhone string     `json:"customer_phone"`
-	UserID        *uuid.UUID `json:"user_id"`
-	CustomPrice   *float64   `json:"custom_price"`
+	ProductID       uuid.UUID  `json:"product_id" binding:"required"`
+	PackagePriceID  *uuid.UUID `json:"package_price_id"`
+	ProviderPriceID *int       `json:"provider_price_id"`
+	CustomerEmail   string     `json:"customer_email" binding:"required,email"`
+	CustomerPhone   string     `json:"customer_phone"`
+	UserID          *uuid.UUID `json:"user_id"`
+	// CustomPriceUSD optional manual USD override of package effective price
+	CustomPriceUSD *float64 `json:"custom_price_usd"`
 }
 
 type OrderResponse struct {
-	ID            uuid.UUID      `json:"id"`
-	OrderNumber   string         `json:"order_number"`
-	Status        string         `json:"status"`
-	Amount        float64        `json:"amount"`
-	Currency      string         `json:"currency"`
-	CustomerEmail string         `json:"customer_email"`
-	CustomerPhone string         `json:"customer_phone"`
-	Product       models.Product `json:"product"`
-	PaymentURL    string         `json:"payment_url,omitempty"`
-	QRCode        string         `json:"qr_code,omitempty"`
-	CreatedAt     time.Time      `json:"created_at"`
+	ID            uuid.UUID            `json:"id"`
+	OrderNumber   string               `json:"order_number"`
+	Status        string               `json:"status"`
+	Amount        float64              `json:"amount"`
+	Currency      string               `json:"currency"`
+	CustomerEmail string               `json:"customer_email"`
+	CustomerPhone string               `json:"customer_phone"`
+	Product       models.Product       `json:"product"`
+	PackagePrice  *models.PackagePrice `json:"package_price,omitempty"`
+	PaymentURL    string               `json:"payment_url,omitempty"`
+	QRCode        string               `json:"qr_code,omitempty"`
+	CreatedAt     time.Time            `json:"created_at"`
 }
 
 type PaymentInitiationRequest struct {
@@ -66,28 +70,53 @@ func (o *OrderService) CreateOrder(req CreateOrderRequest) (*OrderResponse, erro
 		return nil, fmt.Errorf("product not found: %v", err)
 	}
 
-	// Calculate final price
-	finalPrice := product.BasePrice
-	if product.CustomPrice != nil {
-		finalPrice = *product.CustomPrice
+	// Determine package price selection
+	var selectedPackage *models.PackagePrice
+	if req.PackagePriceID != nil {
+		var pp models.PackagePrice
+		if err := o.db.First(&pp, *req.PackagePriceID).Error; err != nil {
+			return nil, fmt.Errorf("package_price not found: %v", err)
+		}
+		selectedPackage = &pp
+	} else if req.ProviderPriceID != nil {
+		var pp models.PackagePrice
+		if err := o.db.Where("provider_price_id = ?", *req.ProviderPriceID).First(&pp).Error; err != nil {
+			return nil, fmt.Errorf("package_price not found for provider_price_id: %v", err)
+		}
+		selectedPackage = &pp
+	} else {
+		return nil, fmt.Errorf("package selection required")
 	}
-	if req.CustomPrice != nil {
-		finalPrice = *req.CustomPrice
+
+	// Validate selected package corresponds to product SKUID
+	if selectedPackage != nil && selectedPackage.SKUID != product.SKUID {
+		return nil, fmt.Errorf("selected package does not belong to product sku")
 	}
+
+	// Calculate final price: start from package effective USD price -> convert to MNT using current rate
+	pricing := NewPricingService(o.db)
+	usdToMnt, _ := pricing.GetUSDToMNTRate()
+	finalPriceUSD := selectedPackage.EffectivePriceUSD
+	if req.CustomPriceUSD != nil {
+		finalPriceUSD = *req.CustomPriceUSD
+	}
+	finalPriceMNT := finalPriceUSD * usdToMnt
 
 	// Generate order number
 	orderNumber := o.qpayService.GenerateOrderNumber()
 
 	// Create order in database
 	order := models.Order{
-		UserID:        req.UserID,
-		ProductID:     req.ProductID,
-		OrderNumber:   orderNumber,
-		Status:        "pending",
-		Amount:        finalPrice,
-		Currency:      "MNT",
-		CustomerEmail: req.CustomerEmail,
-		CustomerPhone: req.CustomerPhone,
+		UserID:          req.UserID,
+		ProductID:       req.ProductID,
+		PackagePriceID:  &selectedPackage.ID,
+		ProviderPriceID: &selectedPackage.ProviderPriceID,
+		OrderNumber:     orderNumber,
+		Status:          "pending",
+		Amount:          finalPriceMNT,
+		Currency:        "MNT",
+		CustomerEmail:   req.CustomerEmail,
+		CustomerPhone:   req.CustomerPhone,
 	}
 
 	if err := o.db.Create(&order).Error; err != nil {
@@ -95,8 +124,8 @@ func (o *OrderService) CreateOrder(req CreateOrderRequest) (*OrderResponse, erro
 	}
 
 	// Create QPay invoice
-	qpayAmount := o.qpayService.FormatAmount(finalPrice)
-	invoiceDescription := fmt.Sprintf("eSIM %s - %s", product.Name, product.DataLimit)
+	qpayAmount := o.qpayService.FormatAmount(finalPriceMNT)
+	invoiceDescription := fmt.Sprintf("eSIM %s - %s (%s)", product.Name, product.DataLimit, selectedPackage.ShowName)
 
 	qpayResponse, err := o.qpayService.CreateInvoice(
 		orderNumber,
@@ -123,7 +152,7 @@ func (o *OrderService) CreateOrder(req CreateOrderRequest) (*OrderResponse, erro
 	paymentTransaction := models.PaymentTransaction{
 		OrderID:           order.ID,
 		QPayTransactionID: qpayResponse.Data.InvoiceID,
-		Amount:            finalPrice,
+		Amount:            finalPriceMNT,
 		Status:            "pending",
 		PaymentMethod:     "qpay",
 		TransactionData:   string(transactionData),
@@ -140,6 +169,7 @@ func (o *OrderService) CreateOrder(req CreateOrderRequest) (*OrderResponse, erro
 		CustomerEmail: order.CustomerEmail,
 		CustomerPhone: order.CustomerPhone,
 		Product:       product,
+		PackagePrice:  selectedPackage,
 		PaymentURL:    qpayResponse.Data.URLs.Web,
 		QRCode:        qpayResponse.Data.QRCode,
 		CreatedAt:     order.CreatedAt,
@@ -149,7 +179,7 @@ func (o *OrderService) CreateOrder(req CreateOrderRequest) (*OrderResponse, erro
 // GetOrder retrieves order information
 func (o *OrderService) GetOrder(orderNumber string) (*OrderResponse, error) {
 	var order models.Order
-	if err := o.db.Preload("Product").Preload("PaymentTransactions").Where("order_number = ?", orderNumber).First(&order).Error; err != nil {
+	if err := o.db.Preload("Product").Preload("PackagePrice").Preload("PaymentTransactions").Where("order_number = ?", orderNumber).First(&order).Error; err != nil {
 		return nil, fmt.Errorf("order not found: %v", err)
 	}
 
@@ -162,6 +192,7 @@ func (o *OrderService) GetOrder(orderNumber string) (*OrderResponse, error) {
 		CustomerEmail: order.CustomerEmail,
 		CustomerPhone: order.CustomerPhone,
 		Product:       order.Product,
+		PackagePrice:  order.PackagePrice,
 		CreatedAt:     order.CreatedAt,
 	}
 
@@ -185,7 +216,7 @@ func (o *OrderService) GetOrder(orderNumber string) (*OrderResponse, error) {
 // InitiatePayment initiates payment for an existing order
 func (o *OrderService) InitiatePayment(orderNumber string) (*PaymentInitiationResponse, error) {
 	var order models.Order
-	if err := o.db.Preload("Product").Where("order_number = ?", orderNumber).First(&order).Error; err != nil {
+	if err := o.db.Preload("Product").Preload("PackagePrice").Where("order_number = ?", orderNumber).First(&order).Error; err != nil {
 		return nil, fmt.Errorf("order not found: %v", err)
 	}
 
@@ -320,14 +351,20 @@ func (o *OrderService) createESIMOrder(order *models.Order) error {
 		return fmt.Errorf("product not found: %v", err)
 	}
 
-	// Create order request for RoamWiFi
-	orderReq := OrderRequest{
-		SKUID:         product.SKUID,
-		PackageID:     product.SKUID, // Using SKUID as package ID for now
-		CustomerEmail: order.CustomerEmail,
-		CustomerPhone: order.CustomerPhone,
-		Quantity:      1,
+	// Load package price if present
+	var packagePrice models.PackagePrice
+	if order.PackagePriceID != nil {
+		if err := o.db.First(&packagePrice, *order.PackagePriceID).Error; err != nil {
+			return fmt.Errorf("package_price not found: %v", err)
+		}
 	}
+
+	// Create order request for RoamWiFi
+	packageID := product.SKUID
+	if order.ProviderPriceID != nil {
+		packageID = fmt.Sprintf("%d", *order.ProviderPriceID)
+	}
+	orderReq := OrderRequest{SKUID: product.SKUID, PackageID: packageID, CustomerEmail: order.CustomerEmail, CustomerPhone: order.CustomerPhone, Quantity: 1}
 
 	// Create order with RoamWiFi
 	roamWiFiResponse, err := o.roamWiFiService.CreateOrder(orderReq)
@@ -372,24 +409,14 @@ func (o *OrderService) GetUserOrders(userID uuid.UUID, page, limit int) ([]Order
 	o.db.Model(&models.Order{}).Where("user_id = ?", userID).Count(&total)
 
 	// Get orders with pagination
-	if err := o.db.Preload("Product").Where("user_id = ?", userID).
+	if err := o.db.Preload("Product").Preload("PackagePrice").Where("user_id = ?", userID).
 		Order("created_at DESC").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to get user orders: %v", err)
 	}
 
 	var responses []OrderResponse
 	for _, order := range orders {
-		response := OrderResponse{
-			ID:            order.ID,
-			OrderNumber:   order.OrderNumber,
-			Status:        order.Status,
-			Amount:        order.Amount,
-			Currency:      order.Currency,
-			CustomerEmail: order.CustomerEmail,
-			CustomerPhone: order.CustomerPhone,
-			Product:       order.Product,
-			CreatedAt:     order.CreatedAt,
-		}
+		response := OrderResponse{ID: order.ID, OrderNumber: order.OrderNumber, Status: order.Status, Amount: order.Amount, Currency: order.Currency, CustomerEmail: order.CustomerEmail, CustomerPhone: order.CustomerPhone, Product: order.Product, PackagePrice: order.PackagePrice, CreatedAt: order.CreatedAt}
 		responses = append(responses, response)
 	}
 
@@ -412,24 +439,14 @@ func (o *OrderService) GetAllOrders(page, limit int, status string) ([]OrderResp
 	query.Count(&total)
 
 	// Get orders with pagination
-	if err := query.Preload("Product").Preload("User").
+	if err := query.Preload("Product").Preload("PackagePrice").Preload("User").
 		Order("created_at DESC").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
 		return nil, 0, fmt.Errorf("failed to get orders: %v", err)
 	}
 
 	var responses []OrderResponse
 	for _, order := range orders {
-		response := OrderResponse{
-			ID:            order.ID,
-			OrderNumber:   order.OrderNumber,
-			Status:        order.Status,
-			Amount:        order.Amount,
-			Currency:      order.Currency,
-			CustomerEmail: order.CustomerEmail,
-			CustomerPhone: order.CustomerPhone,
-			Product:       order.Product,
-			CreatedAt:     order.CreatedAt,
-		}
+		response := OrderResponse{ID: order.ID, OrderNumber: order.OrderNumber, Status: order.Status, Amount: order.Amount, Currency: order.Currency, CustomerEmail: order.CustomerEmail, CustomerPhone: order.CustomerPhone, Product: order.Product, PackagePrice: order.PackagePrice, CreatedAt: order.CreatedAt}
 		responses = append(responses, response)
 	}
 

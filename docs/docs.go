@@ -44,7 +44,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Product analytics data",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ProductAnalyticsResponse"
+                            "$ref": "#/definitions/handlers.ProductAnalyticsResponse"
                         }
                     }
                 }
@@ -70,7 +70,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Sales analytics data",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.SalesAnalyticsResponse"
+                            "$ref": "#/definitions/handlers.SalesAnalyticsResponse"
                         }
                     }
                 }
@@ -247,6 +247,130 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/packages/{priceId}/markup": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Set or clear markup percent (clears override)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin",
+                    "Packages"
+                ],
+                "summary": "Update package markup (Admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Provider Price ID",
+                        "name": "priceId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Markup payload",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdatePackageMarkupRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/packages/{priceId}/override": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Set or clear override price (clears markup usage)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin",
+                    "Packages"
+                ],
+                "summary": "Update package override price (Admin)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Provider Price ID",
+                        "name": "priceId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Override payload (null to clear)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdatePackageOverrideRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Updated",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/admin/pricing/exchange-rate": {
             "put": {
                 "security": [
@@ -273,7 +397,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.UpdateExchangeRateRequest"
+                            "$ref": "#/definitions/handlers.UpdateExchangeRateRequest"
                         }
                     }
                 ],
@@ -322,7 +446,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Current pricing information",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.PricingInfo"
+                            "$ref": "#/definitions/handlers.PricingInfo"
                         }
                     },
                     "500": {
@@ -395,7 +519,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/esim-platform_internal_services.CreateProductRequest"
+                            "$ref": "#/definitions/services.CreateProductRequest"
                         }
                     }
                 ],
@@ -491,7 +615,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/esim-platform_internal_services.UpdateProductRequest"
+                            "$ref": "#/definitions/services.UpdateProductRequest"
                         }
                     }
                 ],
@@ -601,7 +725,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.SetProductPriceRequest"
+                            "$ref": "#/definitions/handlers.SetProductPriceRequest"
                         }
                     }
                 ],
@@ -674,7 +798,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.UpdateSettingsRequest"
+                            "$ref": "#/definitions/handlers.UpdateSettingsRequest"
                         }
                     }
                 ],
@@ -688,6 +812,49 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid input",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/skus/{skuId}/packages/sync": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Fetch provider packages and upsert pricing rows",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Admin",
+                    "Packages"
+                ],
+                "summary": "Sync package prices for a SKU (Admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "SKU ID",
+                        "name": "skuId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Packages synced",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -827,7 +994,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.UpdateUserRequest"
+                            "$ref": "#/definitions/handlers.UpdateUserRequest"
                         }
                     }
                 ],
@@ -883,7 +1050,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.LoginRequest"
+                            "$ref": "#/definitions/handlers.LoginRequest"
                         }
                     }
                 ],
@@ -891,7 +1058,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Login successful",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.LoginResponse"
+                            "$ref": "#/definitions/handlers.LoginResponse"
                         }
                     },
                     "400": {
@@ -931,7 +1098,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.RegisterRequest"
+                            "$ref": "#/definitions/handlers.RegisterRequest"
                         }
                     }
                 ],
@@ -939,7 +1106,7 @@ const docTemplate = `{
                     "201": {
                         "description": "User created successfully",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.LoginResponse"
+                            "$ref": "#/definitions/handlers.LoginResponse"
                         }
                     },
                     "400": {
@@ -981,12 +1148,12 @@ const docTemplate = `{
                 "summary": "Create new eSIM order",
                 "parameters": [
                     {
-                        "description": "Order details",
+                        "description": "Order details (include package_price_id or provider_price_id)",
                         "name": "order",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.CreateOrderRequest"
+                            "$ref": "#/definitions/handlers.CreateOrderRequest"
                         }
                     }
                 ],
@@ -1170,7 +1337,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Products grouped by continent",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ProductsByContinentResponse"
+                            "$ref": "#/definitions/handlers.ProductsByContinentResponse"
                         }
                     },
                     "500": {
@@ -1206,7 +1373,7 @@ const docTemplate = `{
                     "200": {
                         "description": "SKU details",
                         "schema": {
-                            "$ref": "#/definitions/esim-platform_internal_services.SKUInfo"
+                            "$ref": "#/definitions/services.SKUInfo"
                         }
                     },
                     "404": {
@@ -1253,9 +1420,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Detailed packages when detailed=true",
+                        "description": "Detailed packages with pricing when detailed=true",
                         "schema": {
-                            "$ref": "#/definitions/esim-platform_internal_services.RoamWiFiPackagesResponse"
+                            "$ref": "#/definitions/services.EnrichedRoamWiFiPackagesResponse"
                         }
                     },
                     "500": {
@@ -1284,7 +1451,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/esim-platform_internal_services.SKUInfo"
+                                "$ref": "#/definitions/services.SKUInfo"
                             }
                         }
                     },
@@ -1321,7 +1488,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Product details",
                         "schema": {
-                            "$ref": "#/definitions/internal_handlers.ProductResponse"
+                            "$ref": "#/definitions/handlers.ProductResponse"
                         }
                     },
                     "400": {
@@ -1506,301 +1673,14 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "esim-platform_internal_models.User": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "first_name": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_admin": {
-                    "type": "boolean"
-                },
-                "last_name": {
-                    "type": "string"
-                },
-                "phone": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "esim-platform_internal_services.CreateProductRequest": {
-            "type": "object",
-            "required": [
-                "base_price",
-                "name",
-                "sku_id"
-            ],
-            "properties": {
-                "base_price": {
-                    "type": "number"
-                },
-                "continent": {
-                    "type": "string"
-                },
-                "countries": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "custom_price": {
-                    "type": "number"
-                },
-                "data_limit": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "sku_id": {
-                    "type": "string"
-                },
-                "validity_days": {
-                    "type": "integer"
-                }
-            }
-        },
-        "esim-platform_internal_services.PackageInfo": {
-            "type": "object",
-            "properties": {
-                "countries": {
-                    "type": "string"
-                },
-                "data_limit": {
-                    "type": "string"
-                },
-                "package_id": {
-                    "type": "string"
-                },
-                "package_name": {
-                    "type": "string"
-                },
-                "price": {
-                    "type": "number"
-                },
-                "validity": {
-                    "type": "integer"
-                }
-            }
-        },
-        "esim-platform_internal_services.RoamWiFiCountryImage": {
-            "type": "object",
-            "properties": {
-                "country_code": {
-                    "type": "integer"
-                },
-                "image_url": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "name_en": {
-                    "type": "string"
-                }
-            }
-        },
-        "esim-platform_internal_services.RoamWiFiPackage": {
-            "type": "object",
-            "properties": {
-                "api_code": {
-                    "type": "string"
-                },
-                "days": {
-                    "type": "integer"
-                },
-                "expire_days": {
-                    "type": "integer"
-                },
-                "flow_type": {
-                    "type": "integer"
-                },
-                "flows": {
-                    "type": "number"
-                },
-                "had_daypass_detail": {
-                    "type": "integer"
-                },
-                "max_day": {
-                    "type": "integer"
-                },
-                "max_discount": {
-                    "type": "integer"
-                },
-                "min_day": {
-                    "type": "integer"
-                },
-                "must_date": {
-                    "type": "integer"
-                },
-                "network": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/esim-platform_internal_services.RoamWiFiPackageNetwork"
-                    }
-                },
-                "open_card_fee": {
-                    "type": "number"
-                },
-                "overlay": {
-                    "type": "integer"
-                },
-                "pid": {
-                    "type": "integer"
-                },
-                "premark": {
-                    "type": "string"
-                },
-                "price": {
-                    "type": "number"
-                },
-                "price_id": {
-                    "type": "integer"
-                },
-                "show_name": {
-                    "type": "string"
-                },
-                "single_discount": {
-                    "type": "integer"
-                },
-                "single_discount_day": {
-                    "type": "integer"
-                },
-                "support_daypass": {
-                    "type": "integer"
-                },
-                "unit": {
-                    "type": "string"
-                }
-            }
-        },
-        "esim-platform_internal_services.RoamWiFiPackageNetwork": {
-            "type": "object",
-            "properties": {
-                "namecn": {
-                    "type": "string"
-                },
-                "nameen": {
-                    "type": "string"
-                },
-                "operator": {
-                    "type": "string"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "esim-platform_internal_services.RoamWiFiPackagesResponse": {
-            "type": "object",
-            "properties": {
-                "country_code": {
-                    "type": "string"
-                },
-                "country_images": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/esim-platform_internal_services.RoamWiFiCountryImage"
-                    }
-                },
-                "display": {
-                    "type": "string"
-                },
-                "display_en": {
-                    "type": "string"
-                },
-                "image_url": {
-                    "type": "string"
-                },
-                "packages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/esim-platform_internal_services.RoamWiFiPackage"
-                    }
-                },
-                "sku_id": {
-                    "type": "integer"
-                },
-                "support_country": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "esim-platform_internal_services.SKUInfo": {
-            "type": "object",
-            "properties": {
-                "country_code": {
-                    "type": "string"
-                },
-                "display": {
-                    "type": "string"
-                },
-                "sku_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "esim-platform_internal_services.UpdateProductRequest": {
-            "type": "object",
-            "properties": {
-                "base_price": {
-                    "type": "number"
-                },
-                "continent": {
-                    "type": "string"
-                },
-                "countries": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "custom_price": {
-                    "type": "number"
-                },
-                "data_limit": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "is_active": {
-                    "type": "boolean"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "validity_days": {
-                    "type": "integer"
-                }
-            }
-        },
-        "internal_handlers.CreateOrderRequest": {
+        "handlers.CreateOrderRequest": {
             "type": "object",
             "required": [
                 "customer_email",
                 "product_id"
             ],
             "properties": {
-                "custom_price": {
+                "custom_price_usd": {
                     "type": "number"
                 },
                 "customer_email": {
@@ -1809,15 +1689,22 @@ const docTemplate = `{
                 "customer_phone": {
                     "type": "string"
                 },
+                "package_price_id": {
+                    "description": "One of PackagePriceID (internal) or ProviderPriceID (upstream price_id) must be supplied to select package pricing",
+                    "type": "string"
+                },
                 "product_id": {
                     "type": "string"
+                },
+                "provider_price_id": {
+                    "type": "integer"
                 },
                 "user_id": {
                     "type": "string"
                 }
             }
         },
-        "internal_handlers.LoginRequest": {
+        "handlers.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -1832,7 +1719,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.LoginResponse": {
+        "handlers.LoginResponse": {
             "type": "object",
             "properties": {
                 "refresh_token": {
@@ -1842,11 +1729,11 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user": {
-                    "$ref": "#/definitions/esim-platform_internal_models.User"
+                    "$ref": "#/definitions/models.User"
                 }
             }
         },
-        "internal_handlers.PricingInfo": {
+        "handlers.PricingInfo": {
             "type": "object",
             "properties": {
                 "current_exchange_rate": {
@@ -1860,7 +1747,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.ProductAnalyticsResponse": {
+        "handlers.ProductAnalyticsResponse": {
             "type": "object",
             "properties": {
                 "active_products": {
@@ -1881,7 +1768,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.ProductResponse": {
+        "handlers.ProductResponse": {
             "type": "object",
             "properties": {
                 "base_price": {
@@ -1902,7 +1789,7 @@ const docTemplate = `{
                 "currency": {
                     "type": "string"
                 },
-                "custom_price": {
+                "custom_price_usd": {
                     "type": "number"
                 },
                 "data_limit": {
@@ -1946,49 +1833,49 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.ProductsByContinentResponse": {
+        "handlers.ProductsByContinentResponse": {
             "type": "object",
             "properties": {
                 "Africa": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.ProductResponse"
+                        "$ref": "#/definitions/handlers.ProductResponse"
                     }
                 },
                 "Asia": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.ProductResponse"
+                        "$ref": "#/definitions/handlers.ProductResponse"
                     }
                 },
                 "Europe": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.ProductResponse"
+                        "$ref": "#/definitions/handlers.ProductResponse"
                     }
                 },
                 "Global": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.ProductResponse"
+                        "$ref": "#/definitions/handlers.ProductResponse"
                     }
                 },
                 "North America": {
                     "description": "matches inferred continent value",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.ProductResponse"
+                        "$ref": "#/definitions/handlers.ProductResponse"
                     }
                 },
                 "Oceania": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_handlers.ProductResponse"
+                        "$ref": "#/definitions/handlers.ProductResponse"
                     }
                 }
             }
         },
-        "internal_handlers.RegisterRequest": {
+        "handlers.RegisterRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -2013,7 +1900,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.SalesAnalyticsResponse": {
+        "handlers.SalesAnalyticsResponse": {
             "type": "object",
             "properties": {
                 "average_order_value": {
@@ -2036,7 +1923,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.SetProductPriceRequest": {
+        "handlers.SetProductPriceRequest": {
             "type": "object",
             "required": [
                 "price"
@@ -2047,7 +1934,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.UpdateExchangeRateRequest": {
+        "handlers.UpdateExchangeRateRequest": {
             "type": "object",
             "required": [
                 "rate"
@@ -2058,7 +1945,23 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.UpdateSettingsRequest": {
+        "handlers.UpdatePackageMarkupRequest": {
+            "type": "object",
+            "properties": {
+                "markup_percent": {
+                    "type": "number"
+                }
+            }
+        },
+        "handlers.UpdatePackageOverrideRequest": {
+            "type": "object",
+            "properties": {
+                "override_price_usd": {
+                    "type": "number"
+                }
+            }
+        },
+        "handlers.UpdateSettingsRequest": {
             "type": "object",
             "required": [
                 "settings"
@@ -2072,7 +1975,7 @@ const docTemplate = `{
                 }
             }
         },
-        "internal_handlers.UpdateUserRequest": {
+        "handlers.UpdateUserRequest": {
             "type": "object",
             "properties": {
                 "first_name": {
@@ -2086,6 +1989,309 @@ const docTemplate = `{
                 },
                 "phone": {
                     "type": "string"
+                }
+            }
+        },
+        "models.User": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_admin": {
+                    "type": "boolean"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.CreateProductRequest": {
+            "type": "object",
+            "required": [
+                "base_price",
+                "name",
+                "sku_id"
+            ],
+            "properties": {
+                "base_price": {
+                    "type": "number"
+                },
+                "continent": {
+                    "type": "string"
+                },
+                "countries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "custom_price_usd": {
+                    "type": "number"
+                },
+                "data_limit": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "string"
+                },
+                "validity_days": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.EnrichedRoamWiFiPackage": {
+            "type": "object",
+            "properties": {
+                "api_code": {
+                    "type": "string"
+                },
+                "days": {
+                    "type": "integer"
+                },
+                "effective_price_mnt": {
+                    "type": "number"
+                },
+                "effective_price_usd": {
+                    "description": "Pricing enrichment",
+                    "type": "number"
+                },
+                "expire_days": {
+                    "type": "integer"
+                },
+                "flow_type": {
+                    "type": "integer"
+                },
+                "flows": {
+                    "type": "number"
+                },
+                "had_daypass_detail": {
+                    "type": "integer"
+                },
+                "markup_percent": {
+                    "type": "number"
+                },
+                "max_day": {
+                    "type": "integer"
+                },
+                "max_discount": {
+                    "type": "integer"
+                },
+                "min_day": {
+                    "type": "integer"
+                },
+                "must_date": {
+                    "type": "integer"
+                },
+                "network": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.RoamWiFiPackageNetwork"
+                    }
+                },
+                "open_card_fee": {
+                    "type": "number"
+                },
+                "overlay": {
+                    "type": "integer"
+                },
+                "override_price_usd": {
+                    "type": "number"
+                },
+                "pid": {
+                    "type": "integer"
+                },
+                "premark": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "price_id": {
+                    "type": "integer"
+                },
+                "price_source": {
+                    "type": "string"
+                },
+                "show_name": {
+                    "type": "string"
+                },
+                "single_discount": {
+                    "type": "integer"
+                },
+                "single_discount_day": {
+                    "type": "integer"
+                },
+                "support_daypass": {
+                    "type": "integer"
+                },
+                "unit": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.EnrichedRoamWiFiPackagesResponse": {
+            "type": "object",
+            "properties": {
+                "country_code": {
+                    "type": "string"
+                },
+                "country_images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.RoamWiFiCountryImage"
+                    }
+                },
+                "display": {
+                    "type": "string"
+                },
+                "display_en": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "packages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/services.EnrichedRoamWiFiPackage"
+                    }
+                },
+                "sku_id": {
+                    "type": "integer"
+                },
+                "support_country": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "services.PackageInfo": {
+            "type": "object",
+            "properties": {
+                "countries": {
+                    "type": "string"
+                },
+                "data_limit": {
+                    "type": "string"
+                },
+                "package_id": {
+                    "type": "string"
+                },
+                "package_name": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "number"
+                },
+                "validity": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.RoamWiFiCountryImage": {
+            "type": "object",
+            "properties": {
+                "country_code": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "name_en": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.RoamWiFiPackageNetwork": {
+            "type": "object",
+            "properties": {
+                "namecn": {
+                    "type": "string"
+                },
+                "nameen": {
+                    "type": "string"
+                },
+                "operator": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.SKUInfo": {
+            "type": "object",
+            "properties": {
+                "country_code": {
+                    "type": "string"
+                },
+                "display": {
+                    "type": "string"
+                },
+                "sku_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "services.UpdateProductRequest": {
+            "type": "object",
+            "properties": {
+                "base_price": {
+                    "type": "number"
+                },
+                "continent": {
+                    "type": "string"
+                },
+                "countries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "custom_price_usd": {
+                    "type": "number"
+                },
+                "data_limit": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "validity_days": {
+                    "type": "integer"
                 }
             }
         }

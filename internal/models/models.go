@@ -81,32 +81,37 @@ type User struct {
 }
 
 type Product struct {
-	ID                 uuid.UUID   `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	SKUID              string      `json:"sku_id" gorm:"not null"`
-	Name               string      `json:"name" gorm:"not null"`
-	Description        string      `json:"description"`
-	DataLimit          string      `json:"data_limit"`
-	ValidityDays       int         `json:"validity_days"`
-	Countries          StringArray `json:"countries" gorm:"type:text[]"`
-	Continent          string      `json:"continent"`
-	BasePrice          float64     `json:"base_price" gorm:"not null"`
-	CustomPrice        *float64    `json:"custom_price"`
-	PriceMNT           *float64    `json:"price_mnt"`            // Price in Mongolian Tugrik
-	ExchangeRate       *float64    `json:"exchange_rate"`        // USD to MNT exchange rate used
-	ProfitMargin       *float64    `json:"profit_margin"`        // Profit margin percentage
-	AdminPriceOverride *float64    `json:"admin_price_override"` // Manual price override by admin
-	IsActive           bool        `json:"is_active" gorm:"default:true"`
-	LastSyncedAt       *time.Time  `json:"last_synced_at"` // When last synced from RoamWiFi
-	CreatedAt          time.Time   `json:"created_at"`
-	UpdatedAt          time.Time   `json:"updated_at"`
+	ID           uuid.UUID   `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	SKUID        string      `json:"sku_id" gorm:"not null"`
+	Name         string      `json:"name" gorm:"not null"`
+	Description  string      `json:"description"`
+	DataLimit    string      `json:"data_limit"`
+	ValidityDays int         `json:"validity_days"`
+	Countries    StringArray `json:"countries" gorm:"type:text[]"`
+	Continent    string      `json:"continent"`
+	BasePrice    float64     `json:"base_price" gorm:"not null"`
+	// CustomPriceUSD optional product-level USD override used for display if set
+	CustomPriceUSD     *float64   `json:"custom_price_usd"`
+	PriceMNT           *float64   `json:"price_mnt"`            // Price in Mongolian Tugrik
+	ExchangeRate       *float64   `json:"exchange_rate"`        // USD to MNT exchange rate used
+	ProfitMargin       *float64   `json:"profit_margin"`        // Profit margin percentage
+	AdminPriceOverride *float64   `json:"admin_price_override"` // Manual price override by admin
+	IsActive           bool       `json:"is_active" gorm:"default:true"`
+	LastSyncedAt       *time.Time `json:"last_synced_at"` // When last synced from RoamWiFi
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 type Order struct {
-	ID                  uuid.UUID            `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	UserID              *uuid.UUID           `json:"user_id"`
-	User                *User                `json:"user,omitempty"`
-	ProductID           uuid.UUID            `json:"product_id"`
-	Product             Product              `json:"product"`
+	ID        uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	UserID    *uuid.UUID `json:"user_id"`
+	User      *User      `json:"user,omitempty"`
+	ProductID uuid.UUID  `json:"product_id"`
+	Product   Product    `json:"product"`
+	// Package pricing (new)
+	PackagePriceID      *uuid.UUID           `json:"package_price_id" gorm:"index"`
+	PackagePrice        *PackagePrice        `json:"package_price"`
+	ProviderPriceID     *int                 `json:"provider_price_id" gorm:"index"`
 	OrderNumber         string               `json:"order_number" gorm:"uniqueIndex;not null"`
 	QPayInvoiceID       string               `json:"qpay_invoice_id"`
 	Status              string               `json:"status" gorm:"default:'pending'"`
@@ -173,6 +178,36 @@ type Package struct {
 	LastSyncedAt       *time.Time `json:"last_synced_at"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+// PackagePrice stores pricing & override data for provider package (using provider price_id)
+type PackagePrice struct {
+	ID                uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	SKUID             string     `json:"sku_id" gorm:"index;not null"`
+	ProviderPriceID   int        `json:"provider_price_id" gorm:"uniqueIndex:uniq_provider_price"`
+	APICode           string     `json:"api_code" gorm:"index"`
+	ShowName          string     `json:"show_name"`
+	Flows             float64    `json:"flows"`
+	Unit              string     `json:"unit"`
+	Days              int        `json:"days"`
+	RawProviderPrice  float64    `json:"raw_provider_price"`
+	MarkupPercent     *float64   `json:"markup_percent"`
+	OverridePriceUSD  *float64   `json:"override_price_usd"`
+	EffectivePriceUSD float64    `json:"effective_price_usd"`
+	EffectivePriceMNT *float64   `json:"effective_price_mnt"`
+	ExchangeRate      *float64   `json:"exchange_rate"`
+	PriceSource       string     `json:"price_source"` // base|markup|override
+	Active            bool       `json:"active" gorm:"default:true"`
+	LastSyncedAt      *time.Time `json:"last_synced_at"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+func (pp *PackagePrice) BeforeCreate(tx *gorm.DB) error {
+	if pp.ID == uuid.Nil {
+		pp.ID = uuid.New()
+	}
+	return nil
 }
 
 // CurrencyRate represents exchange rates for different currencies
@@ -296,9 +331,9 @@ func (p *Product) GetDisplayPrice() float64 {
 		return *p.PriceMNT
 	}
 
-	// If we have a custom price, use that
-	if p.CustomPrice != nil {
-		return *p.CustomPrice
+	// If we have a custom USD override (legacy), convert not stored -> treat as already MNT? Here we assume override is MNT if PriceMNT absent.
+	if p.CustomPriceUSD != nil {
+		return *p.CustomPriceUSD
 	}
 
 	// Default to base price

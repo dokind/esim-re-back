@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"esim-platform/internal/config"
+	"sync"
 )
 
 type RoamWiFiService struct {
@@ -22,6 +23,11 @@ type RoamWiFiService struct {
 	client      *http.Client
 	token       string
 	tokenExpiry time.Time
+
+	// SKU cache
+	skuCache       []SKUInfo
+	skuCacheExpiry time.Time
+	cacheMu        sync.RWMutex
 }
 
 type PackageInfo struct {
@@ -401,6 +407,16 @@ func (r *RoamWiFiService) ensureAuthenticated() error {
 
 // GetSKUList retrieves the list of available eSIM SKUs from production API
 func (r *RoamWiFiService) GetSKUList() ([]SKUInfo, error) {
+	// Fast path: serve from cache if valid
+	r.cacheMu.RLock()
+	if time.Now().Before(r.skuCacheExpiry) && len(r.skuCache) > 0 {
+		cached := make([]SKUInfo, len(r.skuCache))
+		copy(cached, r.skuCache)
+		r.cacheMu.RUnlock()
+		return cached, nil
+	}
+	r.cacheMu.RUnlock()
+
 	if err := r.ensureAuthenticated(); err != nil {
 		return nil, fmt.Errorf("authentication failed: %v", err)
 	}
@@ -413,7 +429,7 @@ func (r *RoamWiFiService) GetSKUList() ([]SKUInfo, error) {
 		values.Add(k, v)
 	}
 	fullURL := apiURL + "?" + values.Encode()
-	fmt.Printf("GetSkus URL: %s\n", fullURL)
+	fmt.Printf("GetSkus URL: %s (cache miss)\n", fullURL)
 	resp, err := http.Post(fullURL, "application/x-www-form-urlencoded", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %v", err)
@@ -423,7 +439,7 @@ func (r *RoamWiFiService) GetSKUList() ([]SKUInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)
 	}
-	fmt.Printf("SKU List API Response: %s\n", string(body))
+	fmt.Printf("SKU List API Response: %s\n", truncateForLog(string(body), 800))
 	var result map[string]interface{}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %v", err)
@@ -463,7 +479,28 @@ func (r *RoamWiFiService) GetSKUList() ([]SKUInfo, error) {
 			skuList = append(skuList, sku)
 		}
 	}
+	// Store in cache (TTL 10 minutes)
+	r.cacheMu.Lock()
+	r.skuCache = skuList
+	r.skuCacheExpiry = time.Now().Add(10 * time.Minute)
+	r.cacheMu.Unlock()
 	return skuList, nil
+}
+
+// InvalidateSKUCache clears the in-memory SKU list cache
+func (r *RoamWiFiService) InvalidateSKUCache() {
+	r.cacheMu.Lock()
+	defer r.cacheMu.Unlock()
+	r.skuCache = nil
+	r.skuCacheExpiry = time.Time{}
+}
+
+// truncateForLog safely shortens long payloads for logging
+func truncateForLog(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "...<truncated>"
 }
 
 // GetPackagesBySKU retrieves available packages for a specific SKU (legacy signed API)

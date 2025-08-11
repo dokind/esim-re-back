@@ -15,11 +15,14 @@ type OrderHandler struct {
 }
 
 type CreateOrderRequest struct {
-	ProductID     string   `json:"product_id" binding:"required"`
-	CustomerEmail string   `json:"customer_email" binding:"required,email"`
-	CustomerPhone string   `json:"customer_phone"`
-	UserID        *string  `json:"user_id"`
-	CustomPrice   *float64 `json:"custom_price"`
+	ProductID string `json:"product_id" binding:"required"`
+	// One of PackagePriceID (internal) or ProviderPriceID (upstream price_id) must be supplied to select package pricing
+	PackagePriceID  *string  `json:"package_price_id"`
+	ProviderPriceID *int     `json:"provider_price_id"`
+	CustomerEmail   string   `json:"customer_email" binding:"required,email"`
+	CustomerPhone   string   `json:"customer_phone"`
+	UserID          *string  `json:"user_id"`
+	CustomPriceUSD  *float64 `json:"custom_price_usd"`
 }
 
 type PaymentInitiationRequest struct {
@@ -38,7 +41,7 @@ func NewOrderHandler(orderService *services.OrderService) *OrderHandler {
 // @Tags Orders
 // @Accept json
 // @Produce json
-// @Param order body CreateOrderRequest true "Order details"
+// @Param order body CreateOrderRequest true "Order details (include package_price_id or provider_price_id)"
 // @Success 201 {object} map[string]interface{} "Order created successfully"
 // @Failure 400 {object} map[string]interface{} "Invalid input"
 // @Failure 500 {object} map[string]interface{} "Internal server error"
@@ -47,6 +50,12 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Basic validation: require one of package identifiers
+	if (req.PackagePriceID == nil || *req.PackagePriceID == "") && req.ProviderPriceID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "package_price_id or provider_price_id is required"})
 		return
 	}
 
@@ -69,13 +78,17 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	}
 
 	// Create order request
-	orderReq := services.CreateOrderRequest{
-		ProductID:     productID,
-		CustomerEmail: req.CustomerEmail,
-		CustomerPhone: req.CustomerPhone,
-		UserID:        userID,
-		CustomPrice:   req.CustomPrice,
+	var packagePriceUUID *uuid.UUID
+	if req.PackagePriceID != nil && *req.PackagePriceID != "" {
+		ppid, err := uuid.Parse(*req.PackagePriceID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid package_price_id"})
+			return
+		}
+		packagePriceUUID = &ppid
 	}
+
+	orderReq := services.CreateOrderRequest{ProductID: productID, PackagePriceID: packagePriceUUID, ProviderPriceID: req.ProviderPriceID, CustomerEmail: req.CustomerEmail, CustomerPhone: req.CustomerPhone, UserID: userID, CustomPriceUSD: req.CustomPriceUSD}
 
 	order, err := h.orderService.CreateOrder(orderReq)
 	if err != nil {

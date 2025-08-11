@@ -1,211 +1,28 @@
 basePath: /api/v1
 definitions:
-  esim-platform_internal_models.User:
+  handlers.CreateOrderRequest:
     properties:
-      created_at:
-        type: string
-      email:
-        type: string
-      first_name:
-        type: string
-      id:
-        type: string
-      is_admin:
-        type: boolean
-      last_name:
-        type: string
-      phone:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  esim-platform_internal_services.CreateProductRequest:
-    properties:
-      base_price:
-        type: number
-      continent:
-        type: string
-      countries:
-        items:
-          type: string
-        type: array
-      custom_price:
-        type: number
-      data_limit:
-        type: string
-      description:
-        type: string
-      name:
-        type: string
-      sku_id:
-        type: string
-      validity_days:
-        type: integer
-    required:
-    - base_price
-    - name
-    - sku_id
-    type: object
-  esim-platform_internal_services.PackageInfo:
-    properties:
-      countries:
-        type: string
-      data_limit:
-        type: string
-      package_id:
-        type: string
-      package_name:
-        type: string
-      price:
-        type: number
-      validity:
-        type: integer
-    type: object
-  esim-platform_internal_services.RoamWiFiCountryImage:
-    properties:
-      country_code:
-        type: integer
-      image_url:
-        type: string
-      name:
-        type: string
-      name_en:
-        type: string
-    type: object
-  esim-platform_internal_services.RoamWiFiPackage:
-    properties:
-      api_code:
-        type: string
-      days:
-        type: integer
-      expire_days:
-        type: integer
-      flow_type:
-        type: integer
-      flows:
-        type: number
-      had_daypass_detail:
-        type: integer
-      max_day:
-        type: integer
-      max_discount:
-        type: integer
-      min_day:
-        type: integer
-      must_date:
-        type: integer
-      network:
-        items:
-          $ref: '#/definitions/esim-platform_internal_services.RoamWiFiPackageNetwork'
-        type: array
-      open_card_fee:
-        type: number
-      overlay:
-        type: integer
-      pid:
-        type: integer
-      premark:
-        type: string
-      price:
-        type: number
-      price_id:
-        type: integer
-      show_name:
-        type: string
-      single_discount:
-        type: integer
-      single_discount_day:
-        type: integer
-      support_daypass:
-        type: integer
-      unit:
-        type: string
-    type: object
-  esim-platform_internal_services.RoamWiFiPackageNetwork:
-    properties:
-      namecn:
-        type: string
-      nameen:
-        type: string
-      operator:
-        type: string
-      type:
-        type: string
-    type: object
-  esim-platform_internal_services.RoamWiFiPackagesResponse:
-    properties:
-      country_code:
-        type: string
-      country_images:
-        items:
-          $ref: '#/definitions/esim-platform_internal_services.RoamWiFiCountryImage'
-        type: array
-      display:
-        type: string
-      display_en:
-        type: string
-      image_url:
-        type: string
-      packages:
-        items:
-          $ref: '#/definitions/esim-platform_internal_services.RoamWiFiPackage'
-        type: array
-      sku_id:
-        type: integer
-      support_country:
-        items:
-          type: string
-        type: array
-    type: object
-  esim-platform_internal_services.SKUInfo:
-    properties:
-      country_code:
-        type: string
-      display:
-        type: string
-      sku_id:
-        type: integer
-    type: object
-  esim-platform_internal_services.UpdateProductRequest:
-    properties:
-      base_price:
-        type: number
-      continent:
-        type: string
-      countries:
-        items:
-          type: string
-        type: array
-      custom_price:
-        type: number
-      data_limit:
-        type: string
-      description:
-        type: string
-      is_active:
-        type: boolean
-      name:
-        type: string
-      validity_days:
-        type: integer
-    type: object
-  internal_handlers.CreateOrderRequest:
-    properties:
-      custom_price:
+      custom_price_usd:
         type: number
       customer_email:
         type: string
       customer_phone:
         type: string
+      package_price_id:
+        description: One of PackagePriceID (internal) or ProviderPriceID (upstream
+          price_id) must be supplied to select package pricing
+        type: string
       product_id:
         type: string
+      provider_price_id:
+        type: integer
       user_id:
         type: string
     required:
     - customer_email
     - product_id
     type: object
-  internal_handlers.LoginRequest:
+  handlers.LoginRequest:
     properties:
       email:
         type: string
@@ -215,16 +32,16 @@ definitions:
     - email
     - password
     type: object
-  internal_handlers.LoginResponse:
+  handlers.LoginResponse:
     properties:
       refresh_token:
         type: string
       token:
         type: string
       user:
-        $ref: '#/definitions/esim-platform_internal_models.User'
+        $ref: '#/definitions/models.User'
     type: object
-  internal_handlers.PricingInfo:
+  handlers.PricingInfo:
     properties:
       current_exchange_rate:
         type: number
@@ -233,7 +50,7 @@ definitions:
       last_updated:
         type: string
     type: object
-  internal_handlers.ProductAnalyticsResponse:
+  handlers.ProductAnalyticsResponse:
     properties:
       active_products:
         type: integer
@@ -247,7 +64,7 @@ definitions:
       total_products:
         type: integer
     type: object
-  internal_handlers.ProductResponse:
+  handlers.ProductResponse:
     properties:
       base_price:
         type: number
@@ -261,7 +78,7 @@ definitions:
         type: string
       currency:
         type: string
-      custom_price:
+      custom_price_usd:
         type: number
       data_limit:
         type: string
@@ -290,35 +107,35 @@ definitions:
       validity_days:
         type: integer
     type: object
-  internal_handlers.ProductsByContinentResponse:
+  handlers.ProductsByContinentResponse:
     properties:
       Africa:
         items:
-          $ref: '#/definitions/internal_handlers.ProductResponse'
+          $ref: '#/definitions/handlers.ProductResponse'
         type: array
       Asia:
         items:
-          $ref: '#/definitions/internal_handlers.ProductResponse'
+          $ref: '#/definitions/handlers.ProductResponse'
         type: array
       Europe:
         items:
-          $ref: '#/definitions/internal_handlers.ProductResponse'
+          $ref: '#/definitions/handlers.ProductResponse'
         type: array
       Global:
         items:
-          $ref: '#/definitions/internal_handlers.ProductResponse'
+          $ref: '#/definitions/handlers.ProductResponse'
         type: array
       North America:
         description: matches inferred continent value
         items:
-          $ref: '#/definitions/internal_handlers.ProductResponse'
+          $ref: '#/definitions/handlers.ProductResponse'
         type: array
       Oceania:
         items:
-          $ref: '#/definitions/internal_handlers.ProductResponse'
+          $ref: '#/definitions/handlers.ProductResponse'
         type: array
     type: object
-  internal_handlers.RegisterRequest:
+  handlers.RegisterRequest:
     properties:
       email:
         type: string
@@ -335,7 +152,7 @@ definitions:
     - email
     - password
     type: object
-  internal_handlers.SalesAnalyticsResponse:
+  handlers.SalesAnalyticsResponse:
     properties:
       average_order_value:
         type: number
@@ -350,21 +167,31 @@ definitions:
       total_sales:
         type: number
     type: object
-  internal_handlers.SetProductPriceRequest:
+  handlers.SetProductPriceRequest:
     properties:
       price:
         type: number
     required:
     - price
     type: object
-  internal_handlers.UpdateExchangeRateRequest:
+  handlers.UpdateExchangeRateRequest:
     properties:
       rate:
         type: number
     required:
     - rate
     type: object
-  internal_handlers.UpdateSettingsRequest:
+  handlers.UpdatePackageMarkupRequest:
+    properties:
+      markup_percent:
+        type: number
+    type: object
+  handlers.UpdatePackageOverrideRequest:
+    properties:
+      override_price_usd:
+        type: number
+    type: object
+  handlers.UpdateSettingsRequest:
     properties:
       settings:
         additionalProperties:
@@ -373,7 +200,7 @@ definitions:
     required:
     - settings
     type: object
-  internal_handlers.UpdateUserRequest:
+  handlers.UpdateUserRequest:
     properties:
       first_name:
         type: string
@@ -383,6 +210,206 @@ definitions:
         type: string
       phone:
         type: string
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      is_admin:
+        type: boolean
+      last_name:
+        type: string
+      phone:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  services.CreateProductRequest:
+    properties:
+      base_price:
+        type: number
+      continent:
+        type: string
+      countries:
+        items:
+          type: string
+        type: array
+      custom_price_usd:
+        type: number
+      data_limit:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      sku_id:
+        type: string
+      validity_days:
+        type: integer
+    required:
+    - base_price
+    - name
+    - sku_id
+    type: object
+  services.EnrichedRoamWiFiPackage:
+    properties:
+      api_code:
+        type: string
+      days:
+        type: integer
+      effective_price_mnt:
+        type: number
+      effective_price_usd:
+        description: Pricing enrichment
+        type: number
+      expire_days:
+        type: integer
+      flow_type:
+        type: integer
+      flows:
+        type: number
+      had_daypass_detail:
+        type: integer
+      markup_percent:
+        type: number
+      max_day:
+        type: integer
+      max_discount:
+        type: integer
+      min_day:
+        type: integer
+      must_date:
+        type: integer
+      network:
+        items:
+          $ref: '#/definitions/services.RoamWiFiPackageNetwork'
+        type: array
+      open_card_fee:
+        type: number
+      overlay:
+        type: integer
+      override_price_usd:
+        type: number
+      pid:
+        type: integer
+      premark:
+        type: string
+      price:
+        type: number
+      price_id:
+        type: integer
+      price_source:
+        type: string
+      show_name:
+        type: string
+      single_discount:
+        type: integer
+      single_discount_day:
+        type: integer
+      support_daypass:
+        type: integer
+      unit:
+        type: string
+    type: object
+  services.EnrichedRoamWiFiPackagesResponse:
+    properties:
+      country_code:
+        type: string
+      country_images:
+        items:
+          $ref: '#/definitions/services.RoamWiFiCountryImage'
+        type: array
+      display:
+        type: string
+      display_en:
+        type: string
+      image_url:
+        type: string
+      packages:
+        items:
+          $ref: '#/definitions/services.EnrichedRoamWiFiPackage'
+        type: array
+      sku_id:
+        type: integer
+      support_country:
+        items:
+          type: string
+        type: array
+    type: object
+  services.PackageInfo:
+    properties:
+      countries:
+        type: string
+      data_limit:
+        type: string
+      package_id:
+        type: string
+      package_name:
+        type: string
+      price:
+        type: number
+      validity:
+        type: integer
+    type: object
+  services.RoamWiFiCountryImage:
+    properties:
+      country_code:
+        type: integer
+      image_url:
+        type: string
+      name:
+        type: string
+      name_en:
+        type: string
+    type: object
+  services.RoamWiFiPackageNetwork:
+    properties:
+      namecn:
+        type: string
+      nameen:
+        type: string
+      operator:
+        type: string
+      type:
+        type: string
+    type: object
+  services.SKUInfo:
+    properties:
+      country_code:
+        type: string
+      display:
+        type: string
+      sku_id:
+        type: integer
+    type: object
+  services.UpdateProductRequest:
+    properties:
+      base_price:
+        type: number
+      continent:
+        type: string
+      countries:
+        items:
+          type: string
+        type: array
+      custom_price_usd:
+        type: number
+      data_limit:
+        type: string
+      description:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      validity_days:
+        type: integer
     type: object
 host: localhost:8080
 info:
@@ -407,7 +434,7 @@ paths:
         "200":
           description: Product analytics data
           schema:
-            $ref: '#/definitions/internal_handlers.ProductAnalyticsResponse'
+            $ref: '#/definitions/handlers.ProductAnalyticsResponse'
       security:
       - Bearer: []
       summary: Get product analytics (Admin)
@@ -423,7 +450,7 @@ paths:
         "200":
           description: Sales analytics data
           schema:
-            $ref: '#/definitions/internal_handlers.SalesAnalyticsResponse'
+            $ref: '#/definitions/handlers.SalesAnalyticsResponse'
       security:
       - Bearer: []
       summary: Get sales analytics (Admin)
@@ -544,6 +571,88 @@ paths:
       tags:
       - Orders
       - Admin
+  /admin/packages/{priceId}/markup:
+    put:
+      consumes:
+      - application/json
+      description: Set or clear markup percent (clears override)
+      parameters:
+      - description: Provider Price ID
+        in: path
+        name: priceId
+        required: true
+        type: integer
+      - description: Markup payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdatePackageMarkupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: Update package markup (Admin)
+      tags:
+      - Admin
+      - Packages
+  /admin/packages/{priceId}/override:
+    put:
+      consumes:
+      - application/json
+      description: Set or clear override price (clears markup usage)
+      parameters:
+      - description: Provider Price ID
+        in: path
+        name: priceId
+        required: true
+        type: integer
+      - description: Override payload (null to clear)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdatePackageOverrideRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Updated
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: Update package override price (Admin)
+      tags:
+      - Admin
+      - Packages
   /admin/pricing/exchange-rate:
     put:
       consumes:
@@ -555,7 +664,7 @@ paths:
         name: rate
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.UpdateExchangeRateRequest'
+          $ref: '#/definitions/handlers.UpdateExchangeRateRequest'
       produces:
       - application/json
       responses:
@@ -590,7 +699,7 @@ paths:
         "200":
           description: Current pricing information
           schema:
-            $ref: '#/definitions/internal_handlers.PricingInfo'
+            $ref: '#/definitions/handlers.PricingInfo'
         "500":
           description: Internal server error
           schema:
@@ -635,7 +744,7 @@ paths:
         name: product
         required: true
         schema:
-          $ref: '#/definitions/esim-platform_internal_services.CreateProductRequest'
+          $ref: '#/definitions/services.CreateProductRequest'
       produces:
       - application/json
       responses:
@@ -708,7 +817,7 @@ paths:
         name: product
         required: true
         schema:
-          $ref: '#/definitions/esim-platform_internal_services.UpdateProductRequest'
+          $ref: '#/definitions/services.UpdateProductRequest'
       produces:
       - application/json
       responses:
@@ -749,7 +858,7 @@ paths:
         name: price
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.SetProductPriceRequest'
+          $ref: '#/definitions/handlers.SetProductPriceRequest'
       produces:
       - application/json
       responses:
@@ -818,7 +927,7 @@ paths:
         name: settings
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.UpdateSettingsRequest'
+          $ref: '#/definitions/handlers.UpdateSettingsRequest'
       produces:
       - application/json
       responses:
@@ -838,6 +947,34 @@ paths:
       tags:
       - Admin
       - Settings
+  /admin/skus/{skuId}/packages/sync:
+    post:
+      description: Fetch provider packages and upsert pricing rows
+      parameters:
+      - description: SKU ID
+        in: path
+        name: skuId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Packages synced
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - Bearer: []
+      summary: Sync package prices for a SKU (Admin)
+      tags:
+      - Admin
+      - Packages
   /admin/users:
     get:
       description: Retrieve all users with pagination (admin only)
@@ -919,7 +1056,7 @@ paths:
         name: user
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.UpdateUserRequest'
+          $ref: '#/definitions/handlers.UpdateUserRequest'
       produces:
       - application/json
       responses:
@@ -960,14 +1097,14 @@ paths:
         name: credentials
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.LoginRequest'
+          $ref: '#/definitions/handlers.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Login successful
           schema:
-            $ref: '#/definitions/internal_handlers.LoginResponse'
+            $ref: '#/definitions/handlers.LoginResponse'
         "400":
           description: Invalid input
           schema:
@@ -992,14 +1129,14 @@ paths:
         name: user
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.RegisterRequest'
+          $ref: '#/definitions/handlers.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: User created successfully
           schema:
-            $ref: '#/definitions/internal_handlers.LoginResponse'
+            $ref: '#/definitions/handlers.LoginResponse'
         "400":
           description: Invalid input
           schema:
@@ -1024,12 +1161,12 @@ paths:
       - application/json
       description: Create a new order for eSIM purchase
       parameters:
-      - description: Order details
+      - description: Order details (include package_price_id or provider_price_id)
         in: body
         name: order
         required: true
         schema:
-          $ref: '#/definitions/internal_handlers.CreateOrderRequest'
+          $ref: '#/definitions/handlers.CreateOrderRequest'
       produces:
       - application/json
       responses:
@@ -1163,7 +1300,7 @@ paths:
         "200":
           description: Product details
           schema:
-            $ref: '#/definitions/internal_handlers.ProductResponse'
+            $ref: '#/definitions/handlers.ProductResponse'
         "400":
           description: Invalid product ID
           schema:
@@ -1186,7 +1323,7 @@ paths:
         "200":
           description: Products grouped by continent
           schema:
-            $ref: '#/definitions/internal_handlers.ProductsByContinentResponse'
+            $ref: '#/definitions/handlers.ProductsByContinentResponse'
         "500":
           description: Internal server error
           schema:
@@ -1210,7 +1347,7 @@ paths:
         "200":
           description: SKU details
           schema:
-            $ref: '#/definitions/esim-platform_internal_services.SKUInfo'
+            $ref: '#/definitions/services.SKUInfo'
         "404":
           description: SKU not found
           schema:
@@ -1242,9 +1379,9 @@ paths:
       - application/json
       responses:
         "200":
-          description: Detailed packages when detailed=true
+          description: Detailed packages with pricing when detailed=true
           schema:
-            $ref: '#/definitions/esim-platform_internal_services.RoamWiFiPackagesResponse'
+            $ref: '#/definitions/services.EnrichedRoamWiFiPackagesResponse'
         "500":
           description: Internal server error
           schema:
@@ -1264,7 +1401,7 @@ paths:
           description: List of SKUs
           schema:
             items:
-              $ref: '#/definitions/esim-platform_internal_services.SKUInfo'
+              $ref: '#/definitions/services.SKUInfo'
             type: array
         "500":
           description: Failed to retrieve SKUs

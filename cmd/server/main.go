@@ -159,6 +159,19 @@ func main() {
 			adminProducts.POST("/sync", adminHandler.SyncProductsFromRoamWiFi)
 		}
 
+		// Package pricing management
+		adminPackages := admin.Group("/packages")
+		{
+			adminPackages.PUT("/:priceId/markup", adminHandler.UpdatePackageMarkup)
+			adminPackages.PUT("/:priceId/override", adminHandler.UpdatePackageOverride)
+		}
+
+		// SKU package sync
+		adminSkus := admin.Group("/skus")
+		{
+			adminSkus.POST(":skuId/packages/sync", adminHandler.SyncPackagePrices)
+		}
+
 		// Order management
 		adminOrders := admin.Group("/orders")
 		{

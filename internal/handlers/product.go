@@ -16,49 +16,49 @@ type ProductHandler struct {
 }
 
 type CreateProductRequest struct {
-	SKUID        string   `json:"sku_id" binding:"required"`
-	Name         string   `json:"name" binding:"required"`
-	Description  string   `json:"description"`
-	DataLimit    string   `json:"data_limit"`
-	ValidityDays int      `json:"validity_days"`
-	Countries    []string `json:"countries"`
-	Continent    string   `json:"continent"`
-	BasePrice    float64  `json:"base_price" binding:"required"`
-	CustomPrice  *float64 `json:"custom_price"`
+	SKUID          string   `json:"sku_id" binding:"required"`
+	Name           string   `json:"name" binding:"required"`
+	Description    string   `json:"description"`
+	DataLimit      string   `json:"data_limit"`
+	ValidityDays   int      `json:"validity_days"`
+	Countries      []string `json:"countries"`
+	Continent      string   `json:"continent"`
+	BasePrice      float64  `json:"base_price" binding:"required"`
+	CustomPriceUSD *float64 `json:"custom_price_usd"`
 }
 
 type UpdateProductRequest struct {
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	DataLimit    string   `json:"data_limit"`
-	ValidityDays int      `json:"validity_days"`
-	Countries    []string `json:"countries"`
-	Continent    string   `json:"continent"`
-	BasePrice    float64  `json:"base_price"`
-	CustomPrice  *float64 `json:"custom_price"`
-	IsActive     *bool    `json:"is_active"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	DataLimit      string   `json:"data_limit"`
+	ValidityDays   int      `json:"validity_days"`
+	Countries      []string `json:"countries"`
+	Continent      string   `json:"continent"`
+	BasePrice      float64  `json:"base_price"`
+	CustomPriceUSD *float64 `json:"custom_price_usd"`
+	IsActive       *bool    `json:"is_active"`
 }
 
 type ProductResponse struct {
-	ID           string   `json:"id"`
-	SKUID        string   `json:"sku_id"`
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	DataLimit    string   `json:"data_limit"`
-	ValidityDays int      `json:"validity_days"`
-	Countries    []string `json:"countries"`
-	Continent    string   `json:"continent"`
-	BasePrice    float64  `json:"base_price"`
-	CustomPrice  *float64 `json:"custom_price"`
-	PriceMNT     *float64 `json:"price_mnt"`
-	DisplayPrice float64  `json:"display_price"`
-	Currency     string   `json:"currency"`
-	ExchangeRate *float64 `json:"exchange_rate,omitempty"`
-	ProfitMargin *float64 `json:"profit_margin,omitempty"`
-	IsActive     bool     `json:"is_active"`
-	LastSyncedAt *string  `json:"last_synced_at,omitempty"`
-	CreatedAt    string   `json:"created_at"`
-	UpdatedAt    string   `json:"updated_at"`
+	ID             string   `json:"id"`
+	SKUID          string   `json:"sku_id"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	DataLimit      string   `json:"data_limit"`
+	ValidityDays   int      `json:"validity_days"`
+	Countries      []string `json:"countries"`
+	Continent      string   `json:"continent"`
+	BasePrice      float64  `json:"base_price"`
+	CustomPriceUSD *float64 `json:"custom_price_usd"`
+	PriceMNT       *float64 `json:"price_mnt"`
+	DisplayPrice   float64  `json:"display_price"`
+	Currency       string   `json:"currency"`
+	ExchangeRate   *float64 `json:"exchange_rate,omitempty"`
+	ProfitMargin   *float64 `json:"profit_margin,omitempty"`
+	IsActive       bool     `json:"is_active"`
+	LastSyncedAt   *string  `json:"last_synced_at,omitempty"`
+	CreatedAt      string   `json:"created_at"`
+	UpdatedAt      string   `json:"updated_at"`
 }
 
 // ProductsByContinentResponse represents products grouped by continent for documentation
@@ -118,24 +118,24 @@ func (h *ProductHandler) GetSKU(c *gin.Context) {
 // convertToProductResponse converts a Product model to ProductResponse
 func (h *ProductHandler) convertToProductResponse(product models.Product) ProductResponse {
 	response := ProductResponse{
-		ID:           product.ID.String(),
-		SKUID:        product.SKUID,
-		Name:         product.Name,
-		Description:  product.Description,
-		DataLimit:    product.DataLimit,
-		ValidityDays: product.ValidityDays,
-		Countries:    product.Countries,
-		Continent:    product.Continent,
-		BasePrice:    product.BasePrice,
-		CustomPrice:  product.CustomPrice,
-		PriceMNT:     product.PriceMNT,
-		DisplayPrice: product.GetDisplayPrice(),
-		Currency:     "MNT", // Default to MNT for Mongolian users
-		ExchangeRate: product.ExchangeRate,
-		ProfitMargin: product.ProfitMargin,
-		IsActive:     product.IsActive,
-		CreatedAt:    product.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:    product.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		ID:             product.ID.String(),
+		SKUID:          product.SKUID,
+		Name:           product.Name,
+		Description:    product.Description,
+		DataLimit:      product.DataLimit,
+		ValidityDays:   product.ValidityDays,
+		Countries:      product.Countries,
+		Continent:      product.Continent,
+		BasePrice:      product.BasePrice,
+		CustomPriceUSD: product.CustomPriceUSD,
+		PriceMNT:       product.PriceMNT,
+		DisplayPrice:   product.GetDisplayPrice(),
+		Currency:       "MNT", // Default to MNT for Mongolian users
+		ExchangeRate:   product.ExchangeRate,
+		ProfitMargin:   product.ProfitMargin,
+		IsActive:       product.IsActive,
+		CreatedAt:      product.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:      product.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	if product.LastSyncedAt != nil {
@@ -256,7 +256,7 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 // @Param skuId path string true "SKU ID"
 // @Param detailed query bool false "If true returns detailed provider package structure"
 // @Success 200 {array} services.PackageInfo "Basic list of packages"
-// @Success 200 {object} services.RoamWiFiPackagesResponse "Detailed packages when detailed=true"
+// @Success 200 {object} services.EnrichedRoamWiFiPackagesResponse "Detailed packages with pricing when detailed=true"
 // @Failure 500 {object} map[string]interface{} "Internal server error"
 // @Router /products/sku/{skuId}/packages [get]
 func (h *ProductHandler) GetPackagesBySKU(c *gin.Context) {
@@ -296,15 +296,15 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	}
 
 	serviceReq := services.CreateProductRequest{
-		SKUID:        req.SKUID,
-		Name:         req.Name,
-		Description:  req.Description,
-		DataLimit:    req.DataLimit,
-		ValidityDays: req.ValidityDays,
-		Countries:    req.Countries,
-		Continent:    req.Continent,
-		BasePrice:    req.BasePrice,
-		CustomPrice:  req.CustomPrice,
+		SKUID:          req.SKUID,
+		Name:           req.Name,
+		Description:    req.Description,
+		DataLimit:      req.DataLimit,
+		ValidityDays:   req.ValidityDays,
+		Countries:      req.Countries,
+		Continent:      req.Continent,
+		BasePrice:      req.BasePrice,
+		CustomPriceUSD: req.CustomPriceUSD,
 	}
 
 	product, err := h.productService.CreateProduct(serviceReq)
@@ -334,15 +334,15 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	}
 
 	serviceReq := services.UpdateProductRequest{
-		Name:         req.Name,
-		Description:  req.Description,
-		DataLimit:    req.DataLimit,
-		ValidityDays: req.ValidityDays,
-		Countries:    req.Countries,
-		Continent:    req.Continent,
-		BasePrice:    req.BasePrice,
-		CustomPrice:  req.CustomPrice,
-		IsActive:     req.IsActive,
+		Name:           req.Name,
+		Description:    req.Description,
+		DataLimit:      req.DataLimit,
+		ValidityDays:   req.ValidityDays,
+		Countries:      req.Countries,
+		Continent:      req.Continent,
+		BasePrice:      req.BasePrice,
+		CustomPriceUSD: req.CustomPriceUSD,
+		IsActive:       req.IsActive,
 	}
 
 	product, err := h.productService.UpdateProduct(id, serviceReq)

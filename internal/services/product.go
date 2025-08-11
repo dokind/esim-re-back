@@ -1,8 +1,10 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"esim-platform/internal/models"
 
@@ -15,28 +17,201 @@ type ProductService struct {
 	roamWiFiService *RoamWiFiService
 }
 
+// EnrichedRoamWiFiPackage extends provider package data with pricing fields
+type EnrichedRoamWiFiPackage struct {
+	APICode           string                   `json:"api_code"`
+	Flows             float64                  `json:"flows"`
+	Unit              string                   `json:"unit"`
+	Days              int                      `json:"days"`
+	Price             float64                  `json:"price"`
+	PriceID           int                      `json:"price_id"`
+	FlowType          int                      `json:"flow_type"`
+	ShowName          string                   `json:"show_name"`
+	PID               int                      `json:"pid"`
+	Premark           string                   `json:"premark"`
+	Overlay           int                      `json:"overlay"`
+	ExpireDays        int                      `json:"expire_days"`
+	Network           []RoamWiFiPackageNetwork `json:"network"`
+	SupportDaypass    int                      `json:"support_daypass"`
+	OpenCardFee       float64                  `json:"open_card_fee"`
+	MinDay            int                      `json:"min_day"`
+	SingleDiscountDay int                      `json:"single_discount_day"`
+	SingleDiscount    int                      `json:"single_discount"`
+	MaxDiscount       int                      `json:"max_discount"`
+	MaxDay            int                      `json:"max_day"`
+	MustDate          int                      `json:"must_date"`
+	HadDaypassDetail  int                      `json:"had_daypass_detail"`
+	// Pricing enrichment
+	EffectivePriceUSD float64  `json:"effective_price_usd"`
+	EffectivePriceMNT *float64 `json:"effective_price_mnt,omitempty"`
+	PriceSource       string   `json:"price_source"`
+	MarkupPercent     *float64 `json:"markup_percent,omitempty"`
+	OverridePriceUSD  *float64 `json:"override_price_usd,omitempty"`
+}
+
+// EnrichedRoamWiFiPackagesResponse top-level enriched response
+type EnrichedRoamWiFiPackagesResponse struct {
+	SKUId          int                       `json:"sku_id"`
+	Display        string                    `json:"display"`
+	DisplayEn      string                    `json:"display_en"`
+	CountryCode    string                    `json:"country_code"`
+	SupportCountry []string                  `json:"support_country"`
+	ImageURL       string                    `json:"image_url"`
+	CountryImages  []RoamWiFiCountryImage    `json:"country_images"`
+	Packages       []EnrichedRoamWiFiPackage `json:"packages"`
+}
+
 type CreateProductRequest struct {
-	SKUID        string   `json:"sku_id" binding:"required"`
-	Name         string   `json:"name" binding:"required"`
-	Description  string   `json:"description"`
-	DataLimit    string   `json:"data_limit"`
-	ValidityDays int      `json:"validity_days"`
-	Countries    []string `json:"countries"`
-	Continent    string   `json:"continent"`
-	BasePrice    float64  `json:"base_price" binding:"required"`
-	CustomPrice  *float64 `json:"custom_price"`
+	SKUID          string   `json:"sku_id" binding:"required"`
+	Name           string   `json:"name" binding:"required"`
+	Description    string   `json:"description"`
+	DataLimit      string   `json:"data_limit"`
+	ValidityDays   int      `json:"validity_days"`
+	Countries      []string `json:"countries"`
+	Continent      string   `json:"continent"`
+	BasePrice      float64  `json:"base_price" binding:"required"`
+	CustomPriceUSD *float64 `json:"custom_price_usd"`
+}
+
+// SyncPackagePrices fetches provider packages for a SKU and upserts pricing rows
+func (p *ProductService) SyncPackagePrices(skuID string) error {
+	detailed, err := p.roamWiFiService.GetPackagesDetailed(skuID)
+	if err != nil {
+		return fmt.Errorf("fetch detailed packages: %w", err)
+	}
+	if detailed == nil {
+		return fmt.Errorf("no data returned for sku %s", skuID)
+	}
+	pricing := NewPricingService(p.db)
+	rate, _ := pricing.GetUSDToMNTRate()
+	now := time.Now()
+	for _, pkg := range detailed.Packages {
+		effective := pkg.Price
+		priceSource := "base"
+		var existing models.PackagePrice
+		tx := p.db.Where("provider_price_id = ?", pkg.PriceID).First(&existing)
+		if tx.Error != nil && !errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("read existing price: %w", tx.Error)
+		}
+		if existing.ID == uuid.Nil {
+			var effectiveMNT *float64
+			if rate > 0 {
+				mnt := effective * rate
+				effectiveMNT = &mnt
+			}
+			rec := models.PackagePrice{SKUID: skuID, ProviderPriceID: pkg.PriceID, APICode: pkg.APICode, ShowName: pkg.ShowName, Flows: pkg.Flows, Unit: pkg.Unit, Days: pkg.Days, RawProviderPrice: pkg.Price, EffectivePriceUSD: effective, EffectivePriceMNT: effectiveMNT, ExchangeRate: &rate, PriceSource: priceSource, Active: true, LastSyncedAt: &now}
+			if err := p.db.Create(&rec).Error; err != nil {
+				return fmt.Errorf("create package price: %w", err)
+			}
+		} else {
+			existing.SKUID = skuID
+			existing.APICode = pkg.APICode
+			existing.ShowName = pkg.ShowName
+			existing.Flows = pkg.Flows
+			existing.Unit = pkg.Unit
+			existing.Days = pkg.Days
+			existing.RawProviderPrice = pkg.Price
+			if existing.OverridePriceUSD != nil {
+				existing.EffectivePriceUSD = *existing.OverridePriceUSD
+				priceSource = "override"
+			} else if existing.MarkupPercent != nil {
+				existing.EffectivePriceUSD = pkg.Price * (1 + *existing.MarkupPercent/100)
+				priceSource = "markup"
+			} else {
+				existing.EffectivePriceUSD = pkg.Price
+				priceSource = "base"
+			}
+			existing.PriceSource = priceSource
+			existing.ExchangeRate = &rate
+			if rate > 0 {
+				mnt := existing.EffectivePriceUSD * rate
+				existing.EffectivePriceMNT = &mnt
+			}
+			existing.LastSyncedAt = &now
+			existing.Active = true
+			if err := p.db.Save(&existing).Error; err != nil {
+				return fmt.Errorf("update package price: %w", err)
+			}
+		}
+	}
+	var providerIDs []int
+	for _, pkg := range detailed.Packages {
+		providerIDs = append(providerIDs, pkg.PriceID)
+	}
+	if err := p.db.Model(&models.PackagePrice{}).Where("sku_id = ? AND provider_price_id NOT IN ?", skuID, providerIDs).Updates(map[string]interface{}{"active": false}).Error; err != nil {
+		return fmt.Errorf("deactivate missing packages: %w", err)
+	}
+	return nil
+}
+
+// SetPackageMarkup sets markup percent and recomputes effective price (clears override)
+func (p *ProductService) SetPackageMarkup(providerPriceID int, markup float64) error {
+	var pp models.PackagePrice
+	if err := p.db.Where("provider_price_id = ?", providerPriceID).First(&pp).Error; err != nil {
+		return err
+	}
+	pp.MarkupPercent = &markup
+	pp.OverridePriceUSD = nil
+	// recompute
+	base := pp.RawProviderPrice
+	pp.EffectivePriceUSD = base * (1 + markup/100)
+	pp.PriceSource = "markup"
+	rateSvc := NewPricingService(p.db)
+	if rate, err := rateSvc.GetUSDToMNTRate(); err == nil {
+		pp.ExchangeRate = &rate
+		mnt := pp.EffectivePriceUSD * rate
+		pp.EffectivePriceMNT = &mnt
+	} else {
+		pp.ExchangeRate = nil
+	}
+	return p.db.Save(&pp).Error
+}
+
+// SetPackageOverride sets or clears override price (if nil passed clears override and falls back to markup/base)
+func (p *ProductService) SetPackageOverride(providerPriceID int, override *float64) error {
+	var pp models.PackagePrice
+	if err := p.db.Where("provider_price_id = ?", providerPriceID).First(&pp).Error; err != nil {
+		return err
+	}
+	if override == nil {
+		pp.OverridePriceUSD = nil
+		// fallback recompute
+		if pp.MarkupPercent != nil {
+			pp.EffectivePriceUSD = pp.RawProviderPrice * (1 + *pp.MarkupPercent/100)
+			pp.PriceSource = "markup"
+		} else {
+			pp.EffectivePriceUSD = pp.RawProviderPrice
+			pp.PriceSource = "base"
+		}
+	} else {
+		if *override <= 0 {
+			return fmt.Errorf("override must be > 0")
+		}
+		pp.OverridePriceUSD = override
+		pp.EffectivePriceUSD = *override
+		pp.PriceSource = "override"
+	}
+	rateSvc := NewPricingService(p.db)
+	if rate, err := rateSvc.GetUSDToMNTRate(); err == nil {
+		pp.ExchangeRate = &rate
+		mnt := pp.EffectivePriceUSD * rate
+		pp.EffectivePriceMNT = &mnt
+	} else {
+		pp.ExchangeRate = nil
+	}
+	return p.db.Save(&pp).Error
 }
 
 type UpdateProductRequest struct {
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	DataLimit    string   `json:"data_limit"`
-	ValidityDays int      `json:"validity_days"`
-	Countries    []string `json:"countries"`
-	Continent    string   `json:"continent"`
-	BasePrice    float64  `json:"base_price"`
-	CustomPrice  *float64 `json:"custom_price"`
-	IsActive     *bool    `json:"is_active"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	DataLimit      string   `json:"data_limit"`
+	ValidityDays   int      `json:"validity_days"`
+	Countries      []string `json:"countries"`
+	Continent      string   `json:"continent"`
+	BasePrice      float64  `json:"base_price"`
+	CustomPriceUSD *float64 `json:"custom_price_usd"`
+	IsActive       *bool    `json:"is_active"`
 }
 
 func NewProductService(db *gorm.DB, roamWiFiService *RoamWiFiService) *ProductService {
@@ -110,16 +285,16 @@ func (p *ProductService) GetPackagesBySKU(skuID string) ([]PackageInfo, error) {
 // CreateProduct creates a new product
 func (p *ProductService) CreateProduct(req CreateProductRequest) (*models.Product, error) {
 	product := models.Product{
-		SKUID:        req.SKUID,
-		Name:         req.Name,
-		Description:  req.Description,
-		DataLimit:    req.DataLimit,
-		ValidityDays: req.ValidityDays,
-		Countries:    req.Countries,
-		Continent:    req.Continent,
-		BasePrice:    req.BasePrice,
-		CustomPrice:  req.CustomPrice,
-		IsActive:     true,
+		SKUID:          req.SKUID,
+		Name:           req.Name,
+		Description:    req.Description,
+		DataLimit:      req.DataLimit,
+		ValidityDays:   req.ValidityDays,
+		Countries:      req.Countries,
+		Continent:      req.Continent,
+		BasePrice:      req.BasePrice,
+		CustomPriceUSD: req.CustomPriceUSD,
+		IsActive:       true,
 	}
 
 	if err := p.db.Create(&product).Error; err != nil {
@@ -158,8 +333,8 @@ func (p *ProductService) UpdateProduct(productID uuid.UUID, req UpdateProductReq
 	if req.BasePrice > 0 {
 		product.BasePrice = req.BasePrice
 	}
-	if req.CustomPrice != nil {
-		product.CustomPrice = req.CustomPrice
+	if req.CustomPriceUSD != nil {
+		product.CustomPriceUSD = req.CustomPriceUSD
 	}
 	if req.IsActive != nil {
 		product.IsActive = *req.IsActive
@@ -313,6 +488,43 @@ func (p *ProductService) GetPackagesRaw(skuID string) (map[string]interface{}, e
 }
 
 // GetPackagesDetailed proxies to RoamWiFiService detailed response
-func (p *ProductService) GetPackagesDetailed(skuID string) (*RoamWiFiPackagesResponse, error) {
-	return p.roamWiFiService.GetPackagesDetailed(skuID)
+func (p *ProductService) GetPackagesDetailed(skuID string) (*EnrichedRoamWiFiPackagesResponse, error) {
+	base, err := p.roamWiFiService.GetPackagesDetailed(skuID)
+	if err != nil {
+		return nil, err
+	}
+	enriched := &EnrichedRoamWiFiPackagesResponse{
+		SKUId:          base.SKUId,
+		Display:        base.Display,
+		DisplayEn:      base.DisplayEn,
+		CountryCode:    base.CountryCode,
+		SupportCountry: base.SupportCountry,
+		ImageURL:       base.ImageURL,
+		CountryImages:  base.CountryImages,
+		Packages:       make([]EnrichedRoamWiFiPackage, 0, len(base.Packages)),
+	}
+	// Load pricing map
+	var prices []models.PackagePrice
+	priceMap := map[int]models.PackagePrice{}
+	if err := p.db.Where("sku_id = ? AND active = ?", skuID, true).Find(&prices).Error; err == nil {
+		for _, pr := range prices {
+			priceMap[pr.ProviderPriceID] = pr
+		}
+	}
+	// Merge
+	for _, pkg := range base.Packages {
+		merged := EnrichedRoamWiFiPackage{
+			APICode: pkg.APICode, Flows: pkg.Flows, Unit: pkg.Unit, Days: pkg.Days, Price: pkg.Price, PriceID: pkg.PriceID, FlowType: pkg.FlowType, ShowName: pkg.ShowName, PID: pkg.PID, Premark: pkg.Premark, Overlay: pkg.Overlay, ExpireDays: pkg.ExpireDays, Network: pkg.Network, SupportDaypass: pkg.SupportDaypass, OpenCardFee: pkg.OpenCardFee, MinDay: pkg.MinDay, SingleDiscountDay: pkg.SingleDiscountDay, SingleDiscount: pkg.SingleDiscount, MaxDiscount: pkg.MaxDiscount, MaxDay: pkg.MaxDay, MustDate: pkg.MustDate, HadDaypassDetail: pkg.HadDaypassDetail,
+			EffectivePriceUSD: pkg.Price, PriceSource: "base",
+		}
+		if pr, ok := priceMap[pkg.PriceID]; ok {
+			merged.EffectivePriceUSD = pr.EffectivePriceUSD
+			merged.EffectivePriceMNT = pr.EffectivePriceMNT
+			merged.PriceSource = pr.PriceSource
+			merged.MarkupPercent = pr.MarkupPercent
+			merged.OverridePriceUSD = pr.OverridePriceUSD
+		}
+		enriched.Packages = append(enriched.Packages, merged)
+	}
+	return enriched, nil
 }

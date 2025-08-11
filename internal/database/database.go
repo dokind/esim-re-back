@@ -37,6 +37,7 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		&models.AuditLog{},
 		&models.Package{},
 		&models.CurrencyRate{},
+		&models.PackagePrice{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %v", err)

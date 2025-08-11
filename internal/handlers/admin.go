@@ -17,6 +17,14 @@ type AdminHandler struct {
 	pricingService *services.PricingService
 }
 
+type UpdatePackageMarkupRequest struct {
+	MarkupPercent *float64 `json:"markup_percent"`
+}
+
+type UpdatePackageOverrideRequest struct {
+	OverridePriceUSD *float64 `json:"override_price_usd"`
+}
+
 type UpdateOrderStatusRequest struct {
 	Status string `json:"status" binding:"required"`
 }
@@ -55,6 +63,97 @@ func NewAdminHandler(productService *services.ProductService, orderService *serv
 		userService:    userService,
 		pricingService: pricingService,
 	}
+}
+
+// SyncPackagePrices godoc
+// @Summary Sync package prices for a SKU (Admin)
+// @Description Fetch provider packages and upsert pricing rows
+// @Tags Admin,Packages
+// @Produce json
+// @Param skuId path string true "SKU ID"
+// @Success 200 {object} map[string]interface{} "Packages synced"
+// @Failure 500 {object} map[string]interface{} "Internal error"
+// @Security Bearer
+// @Router /admin/skus/{skuId}/packages/sync [post]
+func (h *AdminHandler) SyncPackagePrices(c *gin.Context) {
+	skuID := c.Param("skuId")
+	if err := h.productService.SyncPackagePrices(skuID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "packages synced"})
+}
+
+// UpdatePackageMarkup godoc
+// @Summary Update package markup (Admin)
+// @Description Set or clear markup percent (clears override)
+// @Tags Admin,Packages
+// @Accept json
+// @Produce json
+// @Param priceId path int true "Provider Price ID"
+// @Param body body handlers.UpdatePackageMarkupRequest true "Markup payload"
+// @Success 200 {object} map[string]interface{} "Updated"
+// @Failure 400 {object} map[string]interface{} "Bad request"
+// @Failure 500 {object} map[string]interface{} "Internal error"
+// @Security Bearer
+// @Router /admin/packages/{priceId}/markup [put]
+func (h *AdminHandler) UpdatePackageMarkup(c *gin.Context) {
+	priceIDStr := c.Param("priceId")
+	priceID, err := strconv.Atoi(priceIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid priceId"})
+		return
+	}
+	var req UpdatePackageMarkupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.MarkupPercent == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "markup_percent required"})
+		return
+	}
+	if *req.MarkupPercent < 0 || *req.MarkupPercent > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "markup_percent out of range"})
+		return
+	}
+	if err := h.productService.SetPackageMarkup(priceID, *req.MarkupPercent); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "markup updated"})
+}
+
+// UpdatePackageOverride godoc
+// @Summary Update package override price (Admin)
+// @Description Set or clear override price (clears markup usage)
+// @Tags Admin,Packages
+// @Accept json
+// @Produce json
+// @Param priceId path int true "Provider Price ID"
+// @Param body body handlers.UpdatePackageOverrideRequest true "Override payload (null to clear)"
+// @Success 200 {object} map[string]interface{} "Updated"
+// @Failure 400 {object} map[string]interface{} "Bad request"
+// @Failure 500 {object} map[string]interface{} "Internal error"
+// @Security Bearer
+// @Router /admin/packages/{priceId}/override [put]
+func (h *AdminHandler) UpdatePackageOverride(c *gin.Context) {
+	priceIDStr := c.Param("priceId")
+	priceID, err := strconv.Atoi(priceIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid priceId"})
+		return
+	}
+	var req UpdatePackageOverrideRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.productService.SetPackageOverride(priceID, req.OverridePriceUSD); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "override updated"})
 }
 
 // CreateProduct godoc
